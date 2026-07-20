@@ -1,7 +1,9 @@
 # 학생부 세특 작성기 (세특 Creator · Persona)
 
 학생부 종합전형(학종) 서류평가 기준에 맞춰 **세부능력 및 특기사항(세특)** 초안을 생성하는 단일 HTML 웹앱입니다.
-설치·서버·로그인 없이 `세특작성기.html` 파일을 브라우저로 열면 바로 사용할 수 있습니다.
+설치·서버·로그인 없이 `index.html` 파일을 브라우저로 열면 바로 사용할 수 있습니다.
+
+**바로 사용하기 →** https://seteukcreator-persona.vercel.app/
 
 > ⚠️ 생성 결과는 **초안**입니다. 반드시 교사가 검토·수정한 뒤 사용하세요.
 
@@ -63,7 +65,7 @@
 - 한도 안내 박스에 "하루 약 N명 처리 가능" 실시간 표시
 
 ## 사용법
-1. `세특작성기.html`을 브라우저로 엽니다.
+1. 위 배포 주소로 접속하거나, `index.html`을 브라우저로 엽니다.
 2. AI 제공자를 고르고 API 키를 입력합니다.
    - Anthropic: https://console.anthropic.com/settings/keys
    - Google AI Studio: https://aistudio.google.com/app/apikey
