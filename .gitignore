@@ -1,0 +1,11 @@
+# OS / editor
+Thumbs.db
+Desktop.ini
+.DS_Store
+.vscode/
+.idea/
+
+# temp
+*.tmp
+_verify_tmp.html
+setuk_test.html

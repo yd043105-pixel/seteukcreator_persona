@@ -1,0 +1,1758 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>학생부 세특 작성기 · 멀티 AI · 평가위원회</title>
+<style>
+  :root{
+    --bg:#f4f5f7; --card:#ffffff; --line:#e3e6ea; --ink:#1c2430; --sub:#5b6675;
+    --brand:#2f5fae; --brand-d:#234a89; --accent:#eaf1fb; --ok:#1a8a52; --warn:#b5471f;
+    --purple:#6b3fa0; --purple-d:#57327f;
+    --shadow:0 1px 3px rgba(20,30,50,.08),0 6px 20px rgba(20,30,50,.06);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:"Malgun Gothic","Apple SD Gothic Neo",system-ui,sans-serif;
+    background:var(--bg);color:var(--ink);line-height:1.5;font-size:15px}
+  .wrap{max-width:940px;margin:0 auto;padding:24px 18px 80px}
+  header.top{margin-bottom:18px}
+  header.top h1{font-size:22px;margin:0 0 4px}
+  header.top p{margin:0;color:var(--sub);font-size:13px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;
+    padding:20px;margin-bottom:16px;box-shadow:var(--shadow)}
+  .card h2{font-size:15px;margin:0 0 14px;display:flex;align-items:center;gap:8px}
+  .card h2 .n{background:var(--brand);color:#fff;width:22px;height:22px;border-radius:50%;
+    display:inline-flex;align-items:center;justify-content:center;font-size:12px;flex:none}
+  label{display:block;font-size:13px;font-weight:600;margin-bottom:6px;color:var(--ink)}
+  .hint{font-size:12px;color:var(--sub);font-weight:400;margin-top:4px}
+  input[type=text],input[type=password],input[type=number],textarea,select{
+    width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:9px;
+    font-family:inherit;font-size:14px;background:#fff;color:var(--ink)}
+  input:focus,textarea:focus,select:focus{outline:none;border-color:var(--brand);
+    box-shadow:0 0 0 3px rgba(47,95,174,.12)}
+  textarea{resize:vertical;min-height:96px}
+  textarea#apiKey{min-height:52px;line-height:1.6;white-space:pre;overflow-x:auto}
+  .masked{-webkit-text-security:disc;text-security:disc}
+  .infobox{margin-top:12px;background:var(--accent);border:1px solid #d3e0f4;border-radius:9px;
+    padding:12px;font-size:12.5px;color:var(--ink);line-height:1.6}
+  details.adv{margin-top:12px}
+  details.adv>summary{cursor:pointer;font-size:13px;font-weight:600;color:var(--sub);padding:4px 0}
+  .row{display:flex;gap:12px;flex-wrap:wrap}
+  .row>div{flex:1;min-width:180px}
+  .seg{display:flex;gap:8px;flex-wrap:wrap}
+  .seg button{flex:1;min-width:110px;padding:11px 8px;border:1px solid var(--line);
+    background:#fff;border-radius:9px;cursor:pointer;font-size:14px;font-weight:600;
+    color:var(--sub);transition:.12s}
+  .seg button:hover{border-color:var(--brand)}
+  .seg button.on{background:var(--brand);border-color:var(--brand);color:#fff}
+  .mt14{margin-top:14px}
+  .hidden{display:none}
+  .files{border:1.5px dashed var(--line);border-radius:11px;padding:16px;text-align:center;
+    cursor:pointer;transition:.12s;background:#fafbfc}
+  .files:hover{border-color:var(--brand);background:var(--accent)}
+  .files p{margin:0;color:var(--sub);font-size:13px}
+  .filelist{margin-top:10px;display:flex;flex-direction:column;gap:6px}
+  .fileitem{display:flex;align-items:center;gap:8px;background:var(--accent);
+    border:1px solid #d3e0f4;border-radius:8px;padding:7px 10px;font-size:13px}
+  .fileitem .nm{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .fileitem .x{cursor:pointer;color:var(--warn);font-weight:700;padding:0 4px}
+  .genrow{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:6px}
+  .genrow .genbtn{flex:1;min-width:230px}
+  .genbtn{width:100%;padding:14px;background:var(--brand);color:#fff;border:none;
+    border-radius:11px;font-size:16px;font-weight:700;cursor:pointer;transition:.12s}
+  .genbtn:hover{background:var(--brand-d)}
+  .genbtn.precise{background:var(--purple)}
+  .genbtn.precise:hover{background:var(--purple-d)}
+  .genbtn:disabled{background:#9fb0c8;cursor:not-allowed}
+  .out{background:#fff;border:1px solid var(--line);border-radius:11px;padding:16px;
+    min-height:120px;white-space:pre-wrap;font-size:15px;line-height:1.75}
+  .out.empty{color:var(--sub);display:flex;align-items:center;justify-content:center;
+    text-align:center;min-height:120px}
+  .outbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+  .cnt{font-size:13px;color:var(--sub)}
+  .cnt b{color:var(--brand)}
+  .cnt.over b{color:var(--warn)}
+  .copybtn{padding:7px 14px;background:#fff;border:1px solid var(--line);border-radius:8px;
+    cursor:pointer;font-size:13px;font-weight:600;color:var(--ink)}
+  .copybtn:hover{border-color:var(--brand);color:var(--brand)}
+  .err{background:#fdecec;border:1px solid #f3c0c0;color:#a12626;padding:11px 14px;
+    border-radius:9px;font-size:13px;margin-top:10px}
+  .apiwrap{display:flex;gap:8px;align-items:flex-end}
+  .apiwrap>div{flex:1}
+  .togglekey{padding:10px 12px;border:1px solid var(--line);background:#fff;border-radius:9px;
+    cursor:pointer;font-size:13px;white-space:nowrap;color:var(--sub)}
+  .save{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--sub);margin-top:8px;font-weight:400}
+  .spin{display:inline-block;width:15px;height:15px;border:2px solid rgba(255,255,255,.4);
+    border-top-color:#fff;border-radius:50%;animation:sp .7s linear infinite;vertical-align:-2px}
+  @keyframes sp{to{transform:rotate(360deg)}}
+  /* 진행 상황 */
+  .pcard h2 .n{background:var(--purple)}
+  .pstep{display:flex;gap:9px;align-items:center;padding:6px 2px;font-size:14px;color:var(--sub)}
+  .pstep.run{color:var(--ink)}
+  .pstep.done{color:var(--ink)}
+  .pstep.fail{color:var(--warn)}
+  .pstep .ico{width:20px;text-align:center;flex:none}
+  .pstep .sub{margin-left:auto;font-size:12px;color:var(--sub)}
+  /* 평가 과정 */
+  .review{margin-top:16px;border-top:1px dashed var(--line);padding-top:12px}
+  .review>summary{cursor:pointer;font-weight:700;font-size:14px;padding:6px 0;color:var(--purple)}
+  .badge{display:inline-block;background:#f0e9fa;color:var(--purple);border:1px solid #ddd0f0;
+    border-radius:999px;padding:5px 13px;font-size:13px;font-weight:700;margin:6px 0 10px}
+  .evalcard{border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin:10px 0;background:#fafbfc}
+  .evalcard h4{margin:0;font-size:14px;display:flex;justify-content:space-between;align-items:center;gap:8px}
+  .evalcard .sc{font-size:13px;font-weight:700;color:var(--purple);white-space:nowrap}
+  .evalcard .lbl{font-size:12px;font-weight:700;color:var(--sub);margin-top:9px}
+  .evalcard ul{margin:4px 0 0;padding-left:18px}
+  .evalcard li{font-size:13px;margin:3px 0;line-height:1.55}
+  .evalcard .efail{font-size:12px;color:var(--warn);margin-top:6px}
+  .draftbox{white-space:pre-wrap;background:#fff;border:1px solid var(--line);border-radius:9px;
+    padding:12px;font-size:14px;line-height:1.7;margin-top:8px}
+  details.sub>summary{cursor:pointer;font-size:13px;font-weight:600;color:var(--sub);padding:6px 0}
+  footer{text-align:center;color:var(--sub);font-size:12px;margin-top:20px}
+  a{color:var(--brand)}
+  /* 일괄(배치) 모드 */
+  .stucard{border:1px solid var(--line);border-radius:12px;margin-bottom:12px;background:#fff;overflow:hidden}
+  .stuhead{display:flex;align-items:center;gap:9px;padding:11px 13px;background:#fafbfc;
+    border-bottom:1px solid var(--line);cursor:pointer}
+  .stuhead .cv{color:var(--sub);font-size:11px;flex:none}
+  .stuhead .tt{flex:1;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .stuhead .stbadge{font-size:12px;color:var(--sub);white-space:nowrap}
+  .stuhead .rm{color:var(--warn);font-weight:700;padding:0 6px;cursor:pointer;flex:none}
+  .stubody{padding:14px}
+  .tblwrap{overflow-x:auto;margin-top:10px}
+  .btable{width:100%;border-collapse:collapse;font-size:13px}
+  .btable th,.btable td{border-bottom:1px solid var(--line);padding:8px;text-align:left;vertical-align:top}
+  .btable th{color:var(--sub);font-size:12px;font-weight:700;background:#fafbfc;white-space:nowrap}
+  .btable .rowerr{color:var(--warn);font-size:11.5px;margin-top:3px;line-height:1.4}
+  .minibtn{padding:8px 12px;background:#fff;border:1px solid var(--line);border-radius:8px;
+    cursor:pointer;font-size:13px;font-weight:600;color:var(--ink)}
+  .minibtn:hover{border-color:var(--brand);color:var(--brand)}
+  .minibtn:disabled{color:var(--sub);cursor:not-allowed}
+  .toolrow{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+  .note{background:var(--accent);border:1px solid #d3e0f4;border-radius:9px;padding:10px 12px;
+    font-size:12.5px;margin-bottom:12px}
+  .bsum{font-size:13px;color:var(--sub)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <h1>📝 학생부 종합전형 세특 작성기</h1>
+    <p>Anthropic Claude · Google Gemini 멀티 제공자 지원. 주요 대학 학종 서류평가 기준(학업역량·진로역량·공동체역량)에 맞춰 세특을 생성하며, <b>정밀 생성</b>은 입학사정관 평가위원회(AI 10회 호출)를 통해 완성도를 끌어올립니다. Gemini 다중 키·레이트 리미터로 무료 한도 대량 처리를 지원합니다.</p>
+  </header>
+
+  <!-- 1. 제공자 · API -->
+  <div class="card">
+    <h2><span class="n">1</span> AI 제공자 · API 키 설정</h2>
+    <label>AI 제공자</label>
+    <div class="seg" id="providerSeg">
+      <button data-v="anthropic" class="on">Anthropic Claude</button>
+      <button data-v="gemini">Google Gemini</button>
+    </div>
+
+    <label class="mt14" id="keyLabel">Anthropic API 키</label>
+    <div class="apiwrap">
+      <div>
+        <textarea id="apiKey" class="masked" rows="2" placeholder="sk-ant-..."></textarea>
+      </div>
+      <button class="togglekey" id="toggleKey" type="button">표시</button>
+    </div>
+    <label class="save"><input type="checkbox" id="saveKey" style="width:auto"> 이 브라우저에 키 저장 (본인 PC에서만 사용)</label>
+
+    <div class="row mt14">
+      <div>
+        <label>모델</label>
+        <select id="model"></select>
+        <input type="text" id="customModel" class="mt14 hidden" placeholder="모델 ID 직접 입력 (예: gemini-3.1-pro)">
+      </div>
+      <div>
+        <label>목표 글자 수 <span class="hint" style="display:inline">(공백 포함)</span></label>
+        <input type="number" id="targetLen" value="500" min="100" max="2000" step="50">
+      </div>
+    </div>
+    <p class="hint">키는 <a id="keyLink" href="https://console.anthropic.com/settings/keys" target="_blank">console.anthropic.com</a>에서 발급합니다. 키는 서버로 전송되지 않고 브라우저에서 직접 제공자 API로만 전송됩니다.</p>
+
+    <!-- Gemini 전용: 고급 설정(레이트) -->
+    <details class="adv hidden" id="geminiAdv">
+      <summary>고급 설정 · 무료 한도 (Gemini)</summary>
+      <div class="row mt14">
+        <div><label>분당 요청 RPM</label><input type="number" id="rpm" min="1" value="5"></div>
+        <div><label>분당 토큰 TPM</label><input type="number" id="tpm" min="1000" step="1000" value="250000"></div>
+        <div><label>일일 요청 RPD</label><input type="number" id="rpd" min="1" value="20"></div>
+      </div>
+      <div class="hint">키 개수만큼 실효 한도가 늘어납니다. 값은 모델 선택 시 프리셋으로 채워지며 직접 조정할 수 있습니다.</div>
+    </details>
+    <!-- Gemini 전용: 한도/처리량 안내 -->
+    <div class="infobox hidden" id="geminiInfo"></div>
+  </div>
+
+  <!-- 2. 영역 -->
+  <div class="card" id="card2">
+    <h2><span class="n">2</span> 작성 영역 선택</h2>
+    <label>구분</label>
+    <div class="seg" id="kindSeg">
+      <button data-v="교과" class="on">교과 (과목 세특)</button>
+      <button data-v="비교과">비교과 (창의적 체험활동)</button>
+    </div>
+
+    <div id="subjectBox" class="mt14">
+      <label>과목명</label>
+      <input type="text" id="subject" list="subjectList" placeholder="예: 통합사회, 미적분, 영어Ⅰ, 생명과학Ⅱ …">
+      <datalist id="subjectList">
+        <option>국어</option><option>문학</option><option>독서</option><option>화법과 작문</option><option>언어와 매체</option>
+        <option>수학</option><option>수학Ⅰ</option><option>수학Ⅱ</option><option>미적분</option><option>확률과 통계</option><option>기하</option>
+        <option>영어</option><option>영어Ⅰ</option><option>영어Ⅱ</option><option>영어 독해와 작문</option>
+        <option>통합사회</option><option>한국사</option><option>사회·문화</option><option>생활과 윤리</option><option>윤리와 사상</option><option>정치와 법</option><option>경제</option><option>세계사</option><option>한국지리</option><option>세계지리</option>
+        <option>통합과학</option><option>물리학Ⅰ</option><option>물리학Ⅱ</option><option>화학Ⅰ</option><option>화학Ⅱ</option><option>생명과학Ⅰ</option><option>생명과학Ⅱ</option><option>지구과학Ⅰ</option><option>지구과학Ⅱ</option>
+        <option>정보</option><option>기술·가정</option><option>체육</option><option>음악</option><option>미술</option>
+      </datalist>
+      <div class="hint">계열/전공과 관련지어 작성하려면 아래 '학생 정성 특성'에 진로·희망 계열을 함께 적어주세요.</div>
+    </div>
+
+    <div id="areaBox" class="mt14 hidden">
+      <label>비교과 영역</label>
+      <div class="seg" id="areaSeg">
+        <button data-v="자율" data-len="500" class="on">자율활동</button>
+        <button data-v="진로" data-len="700">진로활동</button>
+        <button data-v="동아리" data-len="500">동아리활동</button>
+      </div>
+      <input type="text" id="areaDetail" class="mt14" placeholder="세부 활동/동아리명 (예: 학급 자치회, 과학탐구동아리 'OO', 진로독서 프로그램)">
+    </div>
+  </div>
+
+  <!-- 3. 학생 정성 -->
+  <div class="card" id="card3">
+    <h2><span class="n">3</span> 학생의 정성적 특성</h2>
+    <label>수업/활동에서 드러난 학습 태도·강점</label>
+    <textarea id="quality" placeholder="예) 수업 중 질문이 많고 개념을 끝까지 파고드는 편임. 모둠 활동에서 의견을 조율하는 역할을 자주 맡음. 희망 진로는 생명공학 연구원. 발표 자료를 스스로 도식화하여 정리하는 강점이 있음."></textarea>
+    <div class="hint">학생이 실제로 보였던 모습을 구체적으로 적을수록 평가기준에 맞는 세특이 나옵니다. (지적 호기심·탐구 태도·협업·성실성·리더십 등)</div>
+  </div>
+
+  <!-- 4. 참고자료 -->
+  <div class="card" id="card4">
+    <h2><span class="n">4</span> 참고 자료 (산출물)</h2>
+    <label>파일 첨부 <span class="hint" style="display:inline">여러 개 가능 · PDF / 이미지 / 텍스트</span></label>
+    <div class="files" id="dropZone">
+      <p>📎 클릭하거나 파일을 끌어다 놓으세요<br><span style="font-size:12px">보고서·발표자료·활동지·수행평가 결과물 등</span></p>
+      <input type="file" id="fileInput" multiple accept=".pdf,.txt,.md,.png,.jpg,.jpeg,.webp,.gif" style="display:none">
+    </div>
+    <div class="filelist" id="fileList"></div>
+    <label class="mt14">또는 텍스트 직접 입력</label>
+    <textarea id="refText" placeholder="산출물 내용을 직접 붙여넣어도 됩니다. (탐구 주제, 활동 요약, 발표 개요 등)"></textarea>
+  </div>
+
+  <!-- 생성 모드 -->
+  <div class="card" id="modeCard">
+    <h2><span class="n">▦</span> 생성 모드</h2>
+    <div class="seg" id="modeSeg">
+      <button data-v="single" class="on">👤 단일 생성</button>
+      <button data-v="batch">👥 일괄 생성</button>
+    </div>
+    <div class="hint">단일 생성은 위 2~4번 카드의 내용으로 1명을, 일괄 생성은 학생 목록에 등록한 여러 명을 순차 처리합니다. (1번 API 설정은 두 모드 공용)</div>
+  </div>
+
+  <!-- 일괄: 학생 목록 -->
+  <div class="card hidden" id="batchCard">
+    <h2><span class="n">👥</span> 학생 목록</h2>
+    <div class="note hidden" id="batchRestoreNote">이전 작업을 복원했습니다. 첨부 파일은 다시 첨부해 주세요.</div>
+    <div id="studentList"></div>
+    <div class="toolrow">
+      <button class="minibtn" id="addStudentBtn">➕ 학생 추가</button>
+      <button class="minibtn" id="importJsonBtn">📂 결과 JSON 불러오기</button>
+      <input type="file" id="importJsonInput" accept=".json,application/json" style="display:none">
+    </div>
+
+    <div class="toolrow" style="align-items:center">
+      <label style="margin:0">학생 간 간격</label>
+      <select id="paceMode" style="width:auto">
+        <option value="auto">자동 (한도 기반)</option>
+        <option value="manual">직접 입력</option>
+      </select>
+      <span id="paceSecWrap" class="hidden">
+        <input type="number" id="paceSec" min="0" step="1" value="0" style="width:90px">
+        <span class="hint" style="display:inline">초</span>
+      </span>
+    </div>
+    <div id="paceInfo" class="hint"></div>
+  </div>
+
+  <!-- 일괄: 실행 -->
+  <div class="genrow hidden" id="batchRunRow">
+    <button class="genbtn" id="batchQuickBtn">⚡ 일괄 빠른 생성</button>
+    <button class="genbtn precise" id="batchPreciseBtn">🏆 일괄 정밀 생성</button>
+  </div>
+  <div id="batchErr"></div>
+
+  <!-- 일괄: 진행 -->
+  <div class="card hidden" id="batchStatusCard">
+    <div class="outbar">
+      <h2 style="margin:0"><span class="n">▶</span> 일괄 진행 상황</h2>
+      <button class="minibtn hidden" id="batchStopBtn">⏹ 중단</button>
+    </div>
+    <div class="bsum" id="batchSummary"></div>
+    <div class="hint" id="paceCountdown"></div>
+    <div class="tblwrap" id="batchTableBox"></div>
+    <div class="toolrow">
+      <button class="minibtn" id="batchRetryBtn">🔁 실패/미처리만 재시도</button>
+      <button class="minibtn" id="dlTxtBtn">⬇ 텍스트(.txt) 내려받기</button>
+      <button class="minibtn" id="dlCsvBtn">⬇ CSV(.csv) 내려받기</button>
+      <button class="minibtn" id="exportJsonBtn">💾 결과 JSON 내보내기</button>
+    </div>
+  </div>
+
+  <!-- 일괄: 결과 보기 -->
+  <div class="card hidden" id="batchResultCard">
+    <div id="batchResultPanel"><div class="out empty">진행표의 '보기'를 누르면 해당 학생의 세특이 표시됩니다.</div></div>
+  </div>
+
+  <!-- 생성 버튼 -->
+  <div class="genrow" id="singleGenRow">
+    <button class="genbtn" id="quickBtn">⚡ 빠른 생성 <span style="font-weight:500;font-size:14px">(AI 1회 호출)</span></button>
+    <button class="genbtn precise" id="preciseBtn">🏆 정밀 생성 — 평가위원회 <span style="font-weight:500;font-size:14px">(AI 10회 호출)</span></button>
+  </div>
+  <p class="hint" id="singleHint" style="margin-bottom:12px">정밀 생성(2라운드): 초안 작성 → 3인 평가 → 개선본 → 4인 재평가(기재요령 포함) → 최종 작성. 총 약 10회 호출, 토큰 사용량이 10배 이상이며 2~5분 걸릴 수 있습니다.</p>
+  <div id="errBox"></div>
+
+  <!-- 진행 상황 -->
+  <div class="card pcard hidden" id="progressCard">
+    <h2><span class="n">▶</span> 평가위원회 진행 상황</h2>
+    <div id="progressList"></div>
+  </div>
+
+  <!-- 결과 -->
+  <div class="card mt14" id="resultCard">
+    <div class="outbar">
+      <h2 style="margin:0"><span class="n">5</span> 생성 결과</h2>
+      <button class="copybtn" id="copyBtn" style="display:none">복사</button>
+    </div>
+    <div class="out empty" id="output">여기에 세특이 생성됩니다.</div>
+    <div class="cnt mt14" id="counter" style="display:none"></div>
+    <div id="reviewBox"></div>
+  </div>
+
+  <footer>학종 공통 평가요소(학업역량·진로역량·공동체역량) 기반 · 생성 결과는 반드시 검토·수정 후 사용하세요.</footer>
+</div>
+
+<script>
+const $ = s => document.querySelector(s);
+let kind = "교과", area = "자율", files = [];
+let curProvider = "anthropic";
+const keyCache = { anthropic:"", gemini:"" };
+
+/* ================= 제공자 설정 ================= */
+const PROVIDERS = {
+  anthropic:{
+    label:"Anthropic API 키", storeKey:"anthropicKey", placeholder:"sk-ant-...",
+    link:"https://console.anthropic.com/settings/keys", linkText:"console.anthropic.com",
+    models:[
+      ["claude-opus-4-8","Claude Opus 4.8 (권장·최고 품질)"],
+      ["claude-sonnet-5","Claude Sonnet 5 (빠름·경제적)"],
+      ["claude-haiku-4-5","Claude Haiku 4.5 (가장 저렴)"]
+    ]
+  },
+  gemini:{
+    label:"Google Gemini API 키", storeKey:"geminiKey", placeholder:"AIza...",
+    link:"https://aistudio.google.com/app/apikey", linkText:"aistudio.google.com",
+    models:[
+      ["gemini-3.1-pro","Gemini 3.1 Pro (권장·고성능)"],
+      ["gemini-3.5-flash","Gemini 3.5 Flash (균형)"],
+      ["gemini-3.1-flash-lite","Gemini 3.1 Flash-Lite (무료 한도 여유)"],
+      ["gemini-2.5-pro","Gemini 2.5 Pro (구버전)"]
+    ]
+  }
+};
+
+/* ---- Gemini 모델별 무료 한도 프리셋 (사용자 조정 가능) ---- */
+const GEMINI_LIMITS = {
+  "gemini-3.1-pro":        {rpm:5,  tpm:250000, rpd:100},
+  "gemini-3.5-flash":      {rpm:10, tpm:250000, rpd:250},
+  "gemini-3.1-flash-lite": {rpm:15, tpm:250000, rpd:1000},
+  "gemini-2.5-pro":        {rpm:5,  tpm:250000, rpd:20},
+  "__default":             {rpm:5,  tpm:250000, rpd:20}
+};
+
+const sleep = ms => new Promise(r=>setTimeout(r, ms));
+
+/* ---- 다중 키 풀 / 라운드로빈 / 소진 관리 ---- */
+const exhaustedKeys = new Set();   // 이번 세션 동안 일일 한도 소진된 키
+let keyRRIndex = 0;
+function getKeyPool(){
+  return apiKeyEl.value.split("\n").map(s=>s.trim()).filter(Boolean);
+}
+function getNextKey(){
+  const pool = getKeyPool();
+  if(pool.length===0) throw new Error("API 키를 입력해 주세요.");
+  const available = pool.filter(k=>!exhaustedKeys.has(k));
+  if(available.length===0) throw new Error("모든 API 키가 일일 한도를 소진했습니다. 내일 다시 시도하거나 키를 추가하세요.");
+  for(let i=0;i<pool.length;i++){
+    const k = pool[keyRRIndex % pool.length];
+    keyRRIndex++;
+    if(!exhaustedKeys.has(k)) return k;
+  }
+  return available[0];
+}
+
+/* ---- 레이트 설정 / 리미터 (Gemini 전용) ---- */
+function getRateCfg(){
+  return {
+    rpm: Math.max(1, +($("#rpm")?.value)||5),
+    tpm: Math.max(1000, +($("#tpm")?.value)||250000),
+    rpd: Math.max(1, +($("#rpd")?.value)||20)
+  };
+}
+function estimateTokens(system, content){
+  let chars = (system||"").length, fileCnt = 0;
+  for(const c of (content||[])){ if(c.kind==="text") chars += (c.text||"").length; else fileCnt++; }
+  return Math.ceil(chars/2) + fileCnt*300;
+}
+const geminiLimiter = {
+  reqs: [], toks: [],
+  prune(now){ const cut=now-60000; this.reqs=this.reqs.filter(t=>t>cut); this.toks=this.toks.filter(x=>x.t>cut); },
+  async acquire(estTokens, keyCount){
+    const kc = Math.max(1, keyCount||1);
+    while(true){
+      const now = Date.now(); this.prune(now);
+      const cfg = getRateCfg();
+      const effRpm = cfg.rpm * kc, effTpm = cfg.tpm * kc;
+      const tokSum = this.toks.reduce((a,x)=>a+x.n,0);
+      const rpmOk = this.reqs.length < effRpm;
+      const tpmOk = (tokSum + estTokens <= effTpm) || this.toks.length===0; // 단일 대형요청은 통과
+      if(rpmOk && tpmOk){ this.reqs.push(now); this.toks.push({t:now, n:estTokens}); return; }
+      const waits = [];
+      if(!rpmOk && this.reqs.length) waits.push(this.reqs[0]+60000-now);
+      if(!tpmOk && this.toks.length) waits.push(this.toks[0].t+60000-now);
+      const positive = waits.filter(x=>x>0);
+      const w = positive.length ? Math.max(200, Math.min(...positive)) : 300;
+      await sleep(Math.min(w, 60000));
+    }
+  }
+};
+
+/* ---- 한도/처리량 안내 & 프리셋 ---- */
+function refreshRatePreset(){
+  if(curProvider!=="gemini") return;
+  const p = GEMINI_LIMITS[getModel()] || GEMINI_LIMITS.__default;
+  $("#rpm").value = p.rpm; $("#tpm").value = p.tpm; $("#rpd").value = p.rpd;
+}
+function updateThroughput(){
+  const isG = curProvider==="gemini";
+  $("#geminiAdv").classList.toggle("hidden", !isG);
+  $("#geminiInfo").classList.toggle("hidden", !isG);
+  try{ updatePaceInfo(); }catch(e){}
+  if(!isG) return;
+  const cfg = getRateCfg();
+  const keys = Math.max(1, getKeyPool().length);
+  const effRpd = cfg.rpd * keys;
+  const preciseN = Math.floor(effRpd/10), quickN = effRpd;
+  $("#geminiInfo").innerHTML =
+    `<b>무료 한도 안내</b> · 모델 <b>${esc(getModel()||"-")}</b> 기준 RPM ${cfg.rpm} / TPM ${cfg.tpm.toLocaleString()} / RPD ${cfg.rpd}, 입력 키 <b>${keys}개</b> → 실효 RPD <b>${effRpd.toLocaleString()}</b><br>
+     정밀 생성(10회/명) 기준 <b>하루 약 ${preciseN.toLocaleString()}명</b>, 빠른 생성(1회/명) 기준 <b>하루 약 ${quickN.toLocaleString()}명</b> 처리 가능<br>
+     <span style="color:var(--sub)">대량(수십~120명) 작업은 <b>빠른 생성 + Flash/Flash-Lite 모델 + 다중 키</b>를 권장합니다. 정밀 생성은 무료 한도에서 소수 학생에만 적합합니다.</span>`;
+}
+
+const apiKeyEl = $("#apiKey"), saveKeyEl = $("#saveKey"), modelEl = $("#model"), customModelEl = $("#customModel");
+
+function updateModelOptions(){
+  const p = PROVIDERS[curProvider];
+  modelEl.innerHTML = "";
+  p.models.forEach(([v,t])=>{
+    const o=document.createElement("option"); o.value=v; o.textContent=t; modelEl.appendChild(o);
+  });
+  const oc=document.createElement("option"); oc.value="__custom__"; oc.textContent="직접 입력..."; modelEl.appendChild(oc);
+  modelEl.value = p.models[0][0];
+  customModelEl.classList.add("hidden");
+}
+modelEl.onchange = () => {
+  customModelEl.classList.toggle("hidden", modelEl.value!=="__custom__");
+  refreshRatePreset(); updateThroughput();
+};
+customModelEl && (customModelEl.oninput = () => updateThroughput());
+function getModel(){
+  return modelEl.value==="__custom__" ? customModelEl.value.trim() : modelEl.value;
+}
+
+function applyProviderUI(){
+  const p = PROVIDERS[curProvider];
+  $("#keyLabel").textContent = p.label + " (여러 개면 한 줄에 하나씩)";
+  apiKeyEl.placeholder = p.placeholder + "  —  여러 개면 한 줄에 하나씩";
+  apiKeyEl.classList.add("masked"); $("#toggleKey").textContent = "표시";
+  const link = $("#keyLink"); link.href = p.link; link.textContent = p.linkText;
+  updateModelOptions();
+  refreshRatePreset();
+  updateThroughput();
+}
+
+function switchProvider(p){
+  if(p===curProvider) return;
+  keyCache[curProvider] = apiKeyEl.value;               // 현재 입력값 메모리 보존
+  if(saveKeyEl.checked) localStorage.setItem(PROVIDERS[curProvider].storeKey, apiKeyEl.value);
+  curProvider = p;
+  applyProviderUI();
+  apiKeyEl.value = keyCache[p] || localStorage.getItem(PROVIDERS[p].storeKey) || "";
+  updateThroughput();
+}
+
+$("#providerSeg").querySelectorAll("button").forEach(b => b.onclick = () => {
+  $("#providerSeg").querySelectorAll("button").forEach(x=>x.classList.remove("on"));
+  b.classList.add("on"); switchProvider(b.dataset.v);
+});
+
+/* ---- API 키 저장/표시 ---- */
+$("#toggleKey").onclick = () => {
+  const masked = apiKeyEl.classList.toggle("masked");
+  $("#toggleKey").textContent = masked ? "표시" : "숨김";
+};
+function persistKey(){
+  keyCache[curProvider] = apiKeyEl.value;
+  const sk = PROVIDERS[curProvider].storeKey;
+  if(saveKeyEl.checked) localStorage.setItem(sk, apiKeyEl.value); else localStorage.removeItem(sk);
+}
+apiKeyEl.oninput = () => { persistKey(); updateThroughput(); };
+saveKeyEl.onchange = persistKey;
+["#rpm","#tpm","#rpd"].forEach(sel => { const el=$(sel); if(el) el.oninput = updateThroughput; });
+
+/* 초기화: 저장된 키 로드 */
+applyProviderUI();
+if(localStorage.getItem("anthropicKey")){ apiKeyEl.value = localStorage.getItem("anthropicKey"); saveKeyEl.checked = true; }
+
+/* ---- 교과/비교과 ---- */
+$("#kindSeg").querySelectorAll("button").forEach(b => b.onclick = () => {
+  $("#kindSeg").querySelectorAll("button").forEach(x=>x.classList.remove("on"));
+  b.classList.add("on"); kind = b.dataset.v;
+  $("#subjectBox").classList.toggle("hidden", kind!=="교과");
+  $("#areaBox").classList.toggle("hidden", kind!=="비교과");
+  syncTargetLen();
+});
+$("#areaSeg").querySelectorAll("button").forEach(b => b.onclick = () => {
+  $("#areaSeg").querySelectorAll("button").forEach(x=>x.classList.remove("on"));
+  b.classList.add("on"); area = b.dataset.v; syncTargetLen();
+});
+function syncTargetLen(){
+  if(kind==="비교과"){
+    const on = $("#areaSeg").querySelector("button.on");
+    $("#targetLen").value = on.dataset.len;
+  } else { $("#targetLen").value = 500; }
+}
+
+/* ---- 파일 ---- */
+const dz = $("#dropZone"), fi = $("#fileInput");
+dz.onclick = () => fi.click();
+dz.ondragover = e => { e.preventDefault(); dz.style.borderColor="var(--brand)"; };
+dz.ondragleave = () => dz.style.borderColor="";
+dz.ondrop = e => { e.preventDefault(); dz.style.borderColor=""; addFiles(e.dataTransfer.files); };
+fi.onchange = () => addFiles(fi.files);
+function addFiles(list){ for(const f of list) files.push(f); fi.value=""; renderFiles(); }
+function renderFiles(){
+  const el = $("#fileList"); el.innerHTML="";
+  files.forEach((f,i)=>{
+    const d = document.createElement("div"); d.className="fileitem";
+    d.innerHTML = `<span>${fileIcon(f)}</span><span class="nm">${f.name}</span>
+      <span style="color:var(--sub);font-size:12px">${(f.size/1024).toFixed(0)}KB</span>
+      <span class="x" data-i="${i}">✕</span>`;
+    el.appendChild(d);
+  });
+  el.querySelectorAll(".x").forEach(x => x.onclick = () => { files.splice(+x.dataset.i,1); renderFiles(); });
+}
+function fileIcon(f){ if(f.type.startsWith("image"))return"🖼️"; if(f.type==="application/pdf")return"📕"; return"📄"; }
+
+function readAsBase64(file){
+  return new Promise((res,rej)=>{ const r=new FileReader();
+    r.onload=()=>res(r.result.split(",")[1]); r.onerror=rej; r.readAsDataURL(file); });
+}
+function readAsText(file){
+  return new Promise((res,rej)=>{ const r=new FileReader();
+    r.onload=()=>res(r.result); r.onerror=rej; r.readAsText(file); });
+}
+
+/* ================= API 호출 추상화 ================= */
+/* 공용 중간 형식: [{kind:"text", text} | {kind:"file", mime, data(base64)}] */
+
+async function callAI({system, content, maxTokens=2000, stream=false, onDelta, jsonMode=false}){
+  const model = getModel();
+  if(!model) throw new Error("모델을 선택하거나 입력해 주세요.");
+  if(getKeyPool().length===0) throw new Error("API 키를 입력해 주세요.");
+  if(curProvider==="anthropic"){
+    const key = getNextKey();
+    return callAnthropic({key, model, system, content, maxTokens, stream, onDelta, jsonMode});
+  }
+  return callGeminiWithRetry({model, system, content, maxTokens, stream, onDelta, jsonMode});
+}
+
+/* ---- Anthropic ---- */
+async function callAnthropic({key, model, system, content, maxTokens, stream, onDelta, jsonMode}){
+  const blocks = content.map(c => {
+    if(c.kind==="text") return {type:"text", text:c.text};
+    if(c.mime==="application/pdf")
+      return {type:"document", source:{type:"base64", media_type:"application/pdf", data:c.data}};
+    return {type:"image", source:{type:"base64", media_type:c.mime, data:c.data}};
+  });
+  const messages = [{role:"user", content:blocks}];
+  const prefill = (jsonMode && !stream);
+  if(prefill) messages.push({role:"assistant", content:"{"});   // JSON 시작 강제
+  const body = {model, max_tokens:maxTokens, stream:!!stream, system, messages};
+  const resp = await fetch("https://api.anthropic.com/v1/messages",{
+    method:"POST",
+    headers:{
+      "content-type":"application/json",
+      "x-api-key":key,
+      "anthropic-version":"2023-06-01",
+      "anthropic-dangerous-direct-browser-access":"true"
+    },
+    body: JSON.stringify(body)
+  });
+  if(!resp.ok){
+    let msg = `HTTP ${resp.status}`;
+    try{ const j=await resp.json(); if(j.error?.message) msg=j.error.message; }catch{}
+    throw new Error(msg);
+  }
+  if(!stream){
+    const j = await resp.json();
+    const t = (j.content||[]).map(b=>b.text||"").join("");
+    return prefill ? "{"+t : t;
+  }
+  const reader = resp.body.getReader(); const dec=new TextDecoder();
+  let buf="", text="";
+  while(true){
+    const {done,value}=await reader.read(); if(done)break;
+    buf += dec.decode(value,{stream:true});
+    const lines = buf.split("\n"); buf = lines.pop();
+    for(const line of lines){
+      if(!line.startsWith("data:")) continue;
+      const data = line.slice(5).trim(); if(!data||data==="[DONE]") continue;
+      try{
+        const ev = JSON.parse(data);
+        if(ev.type==="content_block_delta" && ev.delta?.type==="text_delta"){
+          text += ev.delta.text; onDelta && onDelta(text);
+        } else if(ev.type==="error"){
+          throw new Error(ev.error?.message||"스트리밍 오류");
+        }
+      }catch(e){ if(e.message!=="Unexpected end of JSON input") throw e; }
+    }
+  }
+  return text;
+}
+
+/* ---- Gemini: 레이트 리미터 + 키 로테이션 + 재시도 래퍼 ---- */
+async function callGeminiWithRetry({model, system, content, maxTokens, stream, onDelta, jsonMode}){
+  const estTokens = estimateTokens(system, content);
+  let attempt = 0, backoff = 2000;
+  while(true){
+    const keyCount = Math.max(1, getKeyPool().length);
+    await geminiLimiter.acquire(estTokens, keyCount);
+    const key = getNextKey(); // 모든 키 소진 시 throw
+    try{
+      return await geminiFetch({key, model, system, content, maxTokens, stream, onDelta, jsonMode});
+    }catch(e){
+      if(e.kind==="daily"){ exhaustedKeys.add(key); continue; }       // 일일 한도 → 키 로테이션
+      if(e.kind==="rate" && attempt<4){ attempt++; await sleep(backoff); backoff=Math.min(backoff*2,16000); continue; } // rate → 지수 백오프
+      throw e;
+    }
+  }
+}
+/* ---- Gemini: 단일 요청 ---- */
+async function geminiFetch({key, model, system, content, maxTokens, stream, onDelta, jsonMode}){
+  const parts = content.map(c =>
+    c.kind==="text" ? {text:c.text} : {inline_data:{mime_type:c.mime, data:c.data}});
+  const body = {
+    system_instruction:{parts:[{text:system}]},
+    contents:[{role:"user", parts}],
+    generationConfig:{maxOutputTokens:maxTokens}
+  };
+  if(jsonMode && !stream) body.generationConfig.responseMimeType = "application/json"; // 순수 JSON 보장
+  const base = "https://generativelanguage.googleapis.com/v1beta/models/" + encodeURIComponent(model);
+  const url = stream
+    ? base + ":streamGenerateContent?alt=sse&key=" + encodeURIComponent(key)
+    : base + ":generateContent?key=" + encodeURIComponent(key);
+  const resp = await fetch(url, {method:"POST", headers:{"content-type":"application/json"}, body:JSON.stringify(body)});
+  if(!resp.ok){
+    let em="", j=null;
+    try{ j=await resp.json(); em=j?.error?.message||""; }catch{}
+    const status = j?.error?.status||"";
+    if(resp.status===429 || /RESOURCE_EXHAUSTED/i.test(status) || /RESOURCE_EXHAUSTED|quota|rate limit/i.test(em)){
+      const blob = (em+" "+JSON.stringify(j?.error?.details||"")).toLowerCase();
+      const daily = /per ?day|perday|daily|"day"|requests per day/.test(blob);
+      const err = new Error(em||`HTTP ${resp.status}`); err.kind = daily ? "daily" : "rate"; throw err;
+    }
+    throw new Error(em||`HTTP ${resp.status}`);
+  }
+  if(!stream){
+    const j = await resp.json();
+    if(j.error?.message) throw new Error(j.error.message);
+    return (j.candidates?.[0]?.content?.parts||[]).map(p=>p.text||"").join("");
+  }
+  const reader = resp.body.getReader(); const dec=new TextDecoder();
+  let buf="", text="";
+  while(true){
+    const {done,value}=await reader.read(); if(done)break;
+    buf += dec.decode(value,{stream:true});
+    const lines = buf.split("\n"); buf = lines.pop();
+    for(const line of lines){
+      if(!line.startsWith("data:")) continue;
+      const data = line.slice(5).trim(); if(!data||data==="[DONE]") continue;
+      let ev;
+      try{ ev = JSON.parse(data); }
+      catch(e){ if(e.message==="Unexpected end of JSON input") continue; throw e; }
+      if(ev.error?.message) throw new Error(ev.error.message);
+      const t = (ev.candidates?.[0]?.content?.parts||[]).map(p=>p.text||"").join("");
+      if(t){ text += t; onDelta && onDelta(text); }
+    }
+  }
+  return text;
+}
+
+/* ---- 첨부 파일 → 중간 형식 블록 ---- */
+async function buildFileBlocks(){ return buildFileBlocksFrom(files); }
+async function buildFileBlocksFrom(fileArr){
+  const arr=[];
+  for(const f of (fileArr||[])){
+    if(f.type.startsWith("image/")){
+      arr.push({kind:"file", mime:f.type, data:await readAsBase64(f)});
+    } else if(f.type==="application/pdf"){
+      arr.push({kind:"file", mime:"application/pdf", data:await readAsBase64(f)});
+    } else {
+      const t = await readAsText(f);
+      arr.push({kind:"text", text:`[첨부 텍스트 파일: ${f.name}]\n${t}`});
+    }
+  }
+  return arr;
+}
+
+/* ================= 시스템 프롬프트 ================= */
+const SYSTEM_PROMPT = `당신은 대한민국 고등학교 학교생활기록부 작성 경험이 풍부한 담임·교과 교사입니다.
+학생부 종합전형(학종) 서류평가 기준에 정통하며, 주요 대학이 공통으로 사용하는 평가요소에 맞춰 '세부능력 및 특기사항(세특)'을 작성합니다.
+
+[학종 공통 평가요소 및 평가항목 — 반드시 이 관점을 녹여 작성]
+1. 학업역량 (약 50%)
+   - 학업성취도: 교과의 성취 수준, 학업 발전의 정도
+   - 학업태도: 학업을 수행하고 학습해 나가려는 의지와 노력
+   - 탐구력: 지적 호기심을 바탕으로 사물과 현상을 탐구하고 문제를 해결하려는 노력
+2. 진로역량 (약 30%)
+   - 전공(계열) 관련 교과 이수 노력
+   - 전공(계열) 관련 교과 성취도
+   - 진로 탐색 활동과 경험
+3. 공동체역량 (약 20%)
+   - 협업과 소통능력
+   - 나눔과 배려
+   - 성실성과 규칙준수
+   - 리더십
+
+[세특 작성 원칙]
+- 문체: 개조식이 아닌 서술형, 명사형 종결('~함', '~을 보임', '~하였음')을 사용한다.
+- 구체성: 추상적 칭찬('열심히 함', '우수함')이 아니라 학생이 실제 보인 행동·과정·산출물을 근거로 서술한다.
+- 평가요소 연계: 정성적 특성과 산출물을 위 평가항목(탐구력·학업태도·진로 연계·협업 등)과 자연스럽게 연결한다. 단, 평가요소 명칭을 그대로 나열하지 말고 행동 묘사 안에 녹인다.
+- 과정 중심: 결과보다 탐구/활동의 동기 → 과정 → 배우고 성장한 점 흐름으로 구성한다.
+- 금지사항: 수상 실적, 모의고사·석차 등급, 교외 활동/어학연수, 부모·친인척 정보, 특정 대학·기관명, 학생 실명, 봉사 시간 수치 등 기재 금지 항목은 넣지 않는다.
+- 생성형 AI, 인공지능 도구, 챗봇 활용 등의 표현을 절대 쓰지 않는다. 학생 활동이 AI를 사용했더라도 세특에는 언급하지 않는다.
+- '교과 범위를 넘어선', '대학 수준의', '고교 과정을 초월한' 등 교육과정 범위 초과·선행학습을 암시하는 표현을 쓰지 않는다. 심화 탐구는 '교육과정에서 배운 개념을 확장·연결하여'처럼 교육과정 내 심화로 서술한다.
+- 분량: 지정된 목표 글자 수(공백 포함)의 90~110% 범위를 반드시 지키고 초과하지 않는다. 초과할 것 같으면 핵심을 남기고 압축한다.
+- 하나의 완결된 문단으로 작성하고, 불필요한 머리말·설명·따옴표 없이 세특 본문만 출력한다.`;
+
+/* ---- 평가위원회 공통 전제 ---- */
+const COMMON_EVAL = `당신은 대한민국 주요 대학 학생부종합전형 서류평가 경험이 풍부한 평가자입니다. 학종 공통 평가요소: 학업역량(50%: 학업성취도·학업태도·탐구력), 진로역량(30%: 전공 관련 교과 이수 노력·성취도·진로 탐색 활동), 공동체역량(20%: 협업과 소통·나눔과 배려·성실성과 규칙준수·리더십).
+
+[세특 금지 규칙 — 평가와 개선 지시 모두에 적용]
+- 생성형 AI, 인공지능 도구, 챗봇 활용 등의 표현을 절대 쓰지 않는다. 학생 활동이 AI를 사용했더라도 세특에는 언급하지 않는다.
+- '교과 범위를 넘어선', '대학 수준의', '고교 과정을 초월한' 등 교육과정 범위 초과·선행학습을 암시하는 표현을 쓰지 않는다. 심화 탐구는 '교육과정에서 배운 개념을 확장·연결하여'처럼 교육과정 내 심화로 서술한다.
+- improvements에 생성형 AI 활용 언급이나 교과 범위 초과 서술을 추가하라는 지시를 절대 하지 말 것.
+
+제시된 세특 초안을 아래 관점에서 엄격하게 평가하고, 반드시 JSON만 출력하세요: {"score": 100점 만점 정수, "strengths": [강점 배열], "improvements": [구체적인 수정 지시 배열], "to_perfect": ["이 관점에서 100점을 받으려면 반드시 필요한 구체적 서술 …"]}
+to_perfect는 '무엇이 부족한가'가 아니라 '100점짜리 세특이라면 어떤 문장·근거가 들어 있을가'를 실행 가능한 형태(추가·강화할 문장과 근거의 방향)로 작성하세요. 평가 기준(감식안)은 라운드와 무관하게 동일하게 유지합니다.
+반드시 순수 JSON 객체 하나만 출력하세요. 코드블록(\`\`\`), 마크다운, 여는 설명 문장을 절대 붙이지 마세요. strengths·improvements·to_perfect는 각각 최대 3개 항목, 각 항목은 2문장 이내로 간결하게 작성하여 응답이 잘리지 않게 하세요.`;
+
+const EVALUATORS = [
+  { name:"학업역량 입학사정관", persona:
+    `당신의 전문 관점은 '학업역량'입니다. 이 세특이 학생의 학업성취 수준과 발전 정도를 구체적 근거로 보여주는지, 자기주도적 학업태도(의지·노력·주도성)가 행동으로 드러나는지, 지적 호기심에서 출발한 탐구 과정(문제 인식→탐구 방법→결론 도출)이 논리적으로 서술되는지 평가하세요. 추상적 칭찬('우수함', '열심히 함')만 있고 근거가 없으면 감점하고, 어떤 구체적 행동·산출물 서술을 추가해야 하는지 지시하세요.` },
+  { name:"진로역량 입학사정관", persona:
+    `당신의 전문 관점은 '진로역량'입니다. 이 세특이 학생의 진로(계열) 방향과 유기적으로 연결되는지, 과목/활동 내용이 전공 관련 역량 축적 과정으로 읽히는지, 진로 탐색의 주도성과 심화·확장 과정(호기심→탐색→연계 학습)이 드러나는지 평가하세요. 단, 진로를 억지로 끼워 맞춘 부자연스러운 서술('~학과에 진학하기 위해' 식 직접 언급)은 오히려 감점 요인이므로 자연스러운 연결을 요구하세요.` },
+  { name:"공동체역량 입학사정관", persona:
+    `당신의 전문 관점은 '공동체역량'입니다. 이 세특에서 협업·소통(모둠 활동에서의 역할과 기여), 나눔과 배려(멘토링, 도움 행동), 성실성(꾸준함, 책임 완수), 리더십(구성원 상호작용을 이끄는 모습)이 구체적 상황-행동-영향으로 서술되는지 평가하세요. 공동체역량 요소가 전혀 없다면 활동 맥락에 맞는 자연스러운 보완을 지시하되, 교과 세특의 본질(학업·탐구)을 해치면서까지 억지로 넣으라고 하지는 마세요.` },
+  { name:"기재요령·문체 전문가", persona:
+    `당신은 교육부 학교생활기록부 기재요령에 정통한 베테랑 교사입니다. 관점: (1) 금지사항 위반 여부 — 수상 실적, 모의고사/석차, 교외 활동, 특정 대학·기관명, 학생 실명, 부모 정보, 어학 성적 등이 있으면 score를 40 이하로 주고 반드시 improvements에 삭제 지시. (2) 문체 — 명사형 종결('~함', '~을 보임', '~하였음')의 일관성, 한 문단 서술형. (3) 구체성 — 행동·과정 중심 서술, 동기→과정→성장 흐름. (4) 분량 — 목표 글자 수 준수. 위반 사항을 구체적으로 지적하세요.` }
+];
+
+const CHAIR_PROMPT = `당신은 대학 입학사정관실의 종합평가위원장이며 동시에 학교생활기록부 작성 최고 전문가입니다. 세특 초안과 4명의 전문 평가위원(학업역량·진로역량·공동체역량·기재요령)의 평가 결과를 모두 반영하여 최종 완성본 세특을 작성합니다. 원칙: (1) improvements의 수정 지시를 최대한 반영하되 서로 충돌하면 학업역량>진로역량>기재요령>공동체역량 순으로 우선. (2) 명사형 종결 서술형 한 문단. (3) 금지사항 배제. (4) 목표 글자 수(공백 포함)의 90~110% 범위를 반드시 지키고 초과 금지 — 초과 시 핵심을 남기고 압축한다. (5) 학생 원자료에 없는 사실을 새로 지어내지 않기 — 기존 사실의 서술 방식만 개선. (6) 생성형 AI·인공지능 도구·챗봇 활용 언급을 절대 쓰지 않는다(학생이 AI를 썼더라도 세특에 언급 금지). (7) '교과 범위를 넘어선'·'대학 수준의'·'고교 과정을 초월한' 등 교육과정 범위 초과·선행학습 암시 표현을 쓰지 않고, 심화는 '교육과정에서 배운 개념을 확장·연결하여'처럼 교육과정 내 심화로 서술한다. 최종 세특 본문만 출력하세요. 머리말·설명·따옴표 금지.`;
+
+/* ---- 프롬프트 구성 ---- */
+/* 현재 폼 값으로 st를 만들어 buildUserTextFrom에 위임하는 얇은 래퍼 */
+function buildUserText(){
+  return buildUserTextFrom({
+    kind, area,
+    subject: $("#subject").value,
+    areaDetail: $("#areaDetail").value,
+    quality: $("#quality").value,
+    refText: $("#refText").value,
+    targetLen: $("#targetLen").value
+  });
+}
+/* st = {kind, subject, area, areaDetail, quality, refText, targetLen} — 식별자(name)는 절대 포함하지 않는다 */
+function buildUserTextFrom(st){
+  const q = String(st.quality||"").trim();
+  const ref = String(st.refText||"").trim();
+  const target = st.targetLen;
+  let head = "";
+  if(st.kind==="교과"){
+    const subj = String(st.subject||"").trim() || "(과목 미기재)";
+    head = `[구분] 교과 세부능력 및 특기사항\n[과목] ${subj}`;
+  } else {
+    const detail = String(st.areaDetail||"").trim();
+    const names = {자율:"자율활동",진로:"진로활동",동아리:"동아리활동"};
+    head = `[구분] 비교과 - ${names[st.area]} 특기사항${detail?`\n[세부 활동] ${detail}`:""}`;
+  }
+  return `${head}
+[목표 글자 수] ${target}자 내외 (공백 포함, 초과 금지)
+
+[학생의 정성적 특성 — 수업/활동에서 드러난 학습 태도·강점]
+${q || "(입력 없음 — 첨부 자료를 근거로 학생의 태도·역량을 합리적으로 추론하여 서술)"}
+
+${ref ? `[참고 자료 - 직접 입력]\n${ref}\n` : ""}위 정보와 함께 첨부된 산출물(있는 경우)을 근거로, 학종 평가기준에 부합하는 세특 본문을 작성해 주세요. 세특 본문만 출력합니다.`;
+}
+
+/* ---- 평가 JSON 견고 파싱 (코드펜스 제거 + 정상 파싱 + 필드별 정규식 폴백) ---- */
+function normScore(v){
+  if(typeof v==="number" && isFinite(v)) return Math.min(100, Math.max(0, Math.round(v)));
+  const m = String(v??"").match(/\d{1,3}/);
+  return m ? Math.min(100, parseInt(m[0],10)) : null;
+}
+function pickScore(s){ const m = s.match(/"score"\s*:\s*(\d{1,3})/); return m ? Math.min(100, parseInt(m[1],10)) : null; }
+function pickArray(s, key){
+  let inner = null;
+  const closed = s.match(new RegExp('"'+key+'"\\s*:\\s*\\[([\\s\\S]*?)\\](?=\\s*[,}])'));
+  if(closed){ inner = closed[1]; }
+  else {
+    const open = s.match(new RegExp('"'+key+'"\\s*:\\s*\\[([\\s\\S]*)$')); // 잘린 배열: 끝까지
+    if(open) inner = open[1];
+  }
+  if(inner==null) return [];
+  const items = [], sre = /"((?:[^"\\]|\\.)*)"/g;  // 완성된 "..." 문자열만
+  let x;
+  while((x = sre.exec(inner))!==null){
+    const v = x[1].replace(/\\"/g,'"').replace(/\\n/g,' ').trim();
+    if(v) items.push(v);
+  }
+  return items.slice(0,3);
+}
+function parseEval(txt){
+  let s = String(txt||"").trim();
+  s = s.replace(/^```(?:json)?\s*/i, "").replace(/\s*```\s*$/i, "").trim(); // 코드펜스 제거
+  const st = s.indexOf("{");
+  if(st > 0) s = s.slice(st);                                              // 첫 { 부터
+  // 1) 정상 JSON.parse 시도
+  const first = s.indexOf("{"), last = s.lastIndexOf("}");
+  if(first>=0 && last>first){
+    try{
+      const o = JSON.parse(s.slice(first, last+1));
+      return {
+        score: normScore(o.score),
+        strengths: Array.isArray(o.strengths) ? o.strengths.map(String).slice(0,3) : [],
+        improvements: Array.isArray(o.improvements) ? o.improvements.map(String).slice(0,3) : [],
+        to_perfect: Array.isArray(o.to_perfect) ? o.to_perfect.map(String).slice(0,3) : []
+      };
+    }catch{}
+  }
+  // 2) 필드별 정규식 폴백 (잘린 JSON 복구)
+  const score = pickScore(s);
+  const strengths = pickArray(s, "strengths");
+  const improvements = pickArray(s, "improvements");
+  const to_perfect = pickArray(s, "to_perfect");
+  if(score!=null || strengths.length || improvements.length || to_perfect.length){
+    return { score, strengths, improvements, to_perfect };
+  }
+  // 3) 최후: score만이라도 살리고, raw JSON 덩어리는 노출하지 않음
+  const cleaned = s.replace(/[`{}\[\]]/g,"").replace(/"?score"?\s*:\s*\d+\s*,?/i,"")
+                   .replace(/"(strengths|improvements|to_perfect)"\s*:/gi,"").replace(/\s+/g," ").trim();
+  return { score, strengths:[], improvements: cleaned ? [cleaned.slice(0,200)] : [], to_perfect:[] };
+}
+
+/* ================= 진행 상황 UI ================= */
+let progressShown = false;
+function setupProgress(steps){
+  const card = $("#progressCard"), list = $("#progressList");
+  progressShown = true;
+  card.classList.remove("hidden"); list.innerHTML="";
+  steps.forEach(s=>{
+    const d=document.createElement("div"); d.className="pstep"; d.id="ps-"+s.id;
+    d.innerHTML = `<span class="ico">⏳</span><span class="lbl">${s.label}</span><span class="sub"></span>`;
+    list.appendChild(d);
+  });
+}
+function setStep(id, state, sub){
+  const el = $("#ps-"+id); if(!el) return;
+  el.classList.remove("run","done","fail");
+  const ico = el.querySelector(".ico");
+  if(state==="run"){ el.classList.add("run"); ico.innerHTML='<span class="spin" style="border-color:rgba(107,63,160,.3);border-top-color:var(--purple)"></span>'; }
+  else if(state==="done"){ el.classList.add("done"); ico.textContent="✅"; }
+  else if(state==="fail"){ el.classList.add("fail"); ico.textContent="❌"; }
+  if(sub!==undefined) el.querySelector(".sub").textContent = sub;
+}
+
+/* ================= 생성 ================= */
+const quickBtn = $("#quickBtn"), preciseBtn = $("#preciseBtn");
+quickBtn.onclick = () => run("quick");
+preciseBtn.onclick = () => run("precise");
+
+function beginOutput(){
+  const out = $("#output"); out.classList.remove("empty"); out.textContent="";
+  $("#copyBtn").style.display="none"; $("#counter").style.display="none";
+  $("#reviewBox").innerHTML=""; $("#errBox").innerHTML="";
+}
+function setBusy(on, mode){
+  quickBtn.disabled = on; preciseBtn.disabled = on;
+  if(on){
+    if(mode==="quick") quickBtn.innerHTML='<span class="spin"></span> 생성 중…';
+    else preciseBtn.innerHTML='<span class="spin"></span> 평가위원회 진행 중…';
+  } else {
+    quickBtn.innerHTML='⚡ 빠른 생성 <span style="font-weight:500;font-size:14px">(AI 1회 호출)</span>';
+    preciseBtn.innerHTML='🏆 정밀 생성 — 평가위원회 <span style="font-weight:500;font-size:14px">(AI 10회 호출)</span>';
+  }
+}
+
+async function run(mode){
+  if(!apiKeyEl.value.trim()){ showErr("API 키를 입력해 주세요."); return; }
+  if(!getModel()){ showErr("모델을 선택하거나 직접 입력해 주세요."); return; }
+  beginOutput();
+  progressShown = false;
+  $("#progressCard").classList.add("hidden");
+  setBusy(true, mode);
+  try{
+    if(mode==="quick") await generateQuick();
+    else await generatePrecise();
+  }catch(e){
+    showErr((mode==="precise"?"정밀 생성 실패":"생성 실패") + ": " + e.message + "  (키·잔액·네트워크를 확인하세요)");
+  }
+  setBusy(false, mode);
+}
+
+/* ---- 빠른 생성 코어 (단일/일괄 공용) ---- */
+async function runQuickCore({rawText, fileBlocks, onDelta}){
+  const content = [...fileBlocks, {kind:"text", text:rawText}];
+  const text = await callAI({
+    system:SYSTEM_PROMPT, content, maxTokens:2000, stream:true,
+    onDelta:t => { onDelta && onDelta(t); }
+  });
+  if(!text.trim()){ const e = new Error("응답이 비어 있습니다. 다시 시도해 주세요."); e.emptyResult = true; throw e; }
+  return text;
+}
+
+/* ---- 빠른 생성 (단일 모드 래퍼) ---- */
+async function generateQuick(){
+  const out = $("#output");
+  const fileBlocks = await buildFileBlocks();
+  try{
+    const text = await runQuickCore({
+      rawText: buildUserText(), fileBlocks,
+      onDelta: t => { out.textContent = t; }
+    });
+    finishCount(text);
+  }catch(e){
+    if(e.emptyResult){ showErr("응답이 비어 있습니다. 다시 시도해 주세요."); return; }
+    throw e;
+  }
+}
+
+/* ---- 정밀 생성 (2라운드 평가위원회) ---- */
+
+// 평가 라운드 실행. evaluators: 이번 라운드 평가자 배열. second=true면 1차 지적을 이름(name)으로 매칭해 전달.
+async function runEvalRound({idPrefix, evaluators, draft, rawText, fileBlocks, second, prevEvals, onStep}){
+  const step = onStep || (()=>{});
+  const extra = second
+    ? "\n\n[중요] 이 초안은 1차 평가를 거쳐 개선된 2차 버전입니다. 아래 [1차 평가에서 지적된 사항]이 실제로 반영되었는지 항목별로 확인하세요. 반영된 항목은 점수에 그대로 반영하여 상향하고, 여전히 미흡한 항목과 새로 발견한 미비점만 improvements에 남기세요. 평가 기준 자체는 1차와 동일하게 유지합니다."
+    : "";
+  const baseMsg = `[평가 대상 세특 초안]\n${draft}\n\n[학생 원자료 요약]\n${rawText}${extra}`;
+  evaluators.forEach((ev,i)=> step(idPrefix+i,"run"));
+  return await Promise.all(evaluators.map(async (ev,i)=>{
+    let msg = baseMsg;
+    if(second){
+      const prev = (prevEvals||[]).find(p => p.name===ev.name);  // 인덱스가 아닌 이름으로 매칭
+      const prevImp = prev ? (prev.improvements||[]) : [];
+      msg += `\n\n[1차 평가에서 지적된 사항]\n${prevImp.length ? prevImp.map(s=>"- "+s).join("\n") : "- (이 관점은 1차 평가에 없었음 — 이번 라운드에서 처음 평가)"}`;
+    }
+    const evalContent = [...fileBlocks, {kind:"text", text:msg}];
+    try{
+      const raw = await callAI({
+        system: COMMON_EVAL + "\n\n" + ev.persona,
+        content: evalContent, maxTokens:3000, stream:false, jsonMode:true
+      });
+      const parsed = parseEval(raw);
+      step(idPrefix+i,"done", parsed.score!=null ? parsed.score+"점" : "완료");
+      return {name:ev.name, ...parsed, ok:true};
+    }catch(e){
+      step(idPrefix+i,"fail", "실패");
+      return {name:ev.name, score:null, strengths:[], improvements:[], to_perfect:[], ok:false, error:e.message};
+    }
+  }));
+}
+
+// 종합평가위원 유저 메시지 구성
+function fmtEvals(oks){
+  return oks.map(r =>
+    `● ${r.name} 평가\n${JSON.stringify({score:r.score, strengths:r.strengths, improvements:r.improvements, to_perfect:r.to_perfect||[]}, null, 2)}`
+  ).join("\n\n");
+}
+/* 인자 optional — 없으면 기존대로 DOM(#targetLen)에서 읽는다 */
+function lenRange(target){
+  const src = (target===undefined || target===null || target==="") ? $("#targetLen").value : target;
+  const t = Math.max(100, +src||500);
+  return {t, lo:Math.round(t*0.9), hi:Math.round(t*1.1)};
+}
+function buildChairMsg({rawText, draft, oks, final, prevOks, targetLen}){
+  const {t, lo, hi} = lenRange(targetLen);
+  if(!final){
+    return `[학생 원자료 요약]
+${rawText}
+
+[세특 초안]
+${draft}
+
+[전문 평가위원 평가 결과 (${oks.length}인)]
+${fmtEvals(oks)}
+
+위 초안과 평가 결과를 반영하여 개선된 세특 본문만 작성하세요. 소극적 부분 수정이 아니라 과감하게 다시 써도 됩니다. 각 평가위원의 improvements와 to_perfect 항목을 하나도 빠짐없이 반영하세요. 각 항목이 어떻게 반영됐는지 스스로 점검한 후, 반영이 불가능한 항목(원자료에 근거 없음)만 제외하세요. 단, 원자료에 없는 사실을 창작하는 것은 여전히 금지 — 기존 사실의 서술 밀도(동기→과정→결과→성장·확장)를 끌어올리는 방식으로 반영하세요. 분량은 목표 ${t}자의 90~110%(${lo}~${hi}자)를 지키고 초과하지 마세요.`;
+  }
+  const prevBlock = (prevOks && prevOks.length)
+    ? `\n\n[1차 평가에서 지적된 사항 (참고 — 이미 개선본에 반영되었어야 함)]\n${prevOks.map(r=>`● ${r.name}\n${(r.improvements||[]).length ? (r.improvements).map(s=>"- "+s).join("\n") : "- (없음)"}`).join("\n\n")}`
+    : "";
+  return `[학생 원자료 요약]
+${rawText}
+
+[세특 초안 — 1라운드 개선본]
+${draft}${prevBlock}
+
+[2차 평가위원 평가 결과 (${oks.length}인)]
+${fmtEvals(oks)}
+
+2차 평가에서 여전히 남은 지적과 to_perfect 항목을 모두 해소한 완성본을 작성하세요. 원자료에 없는 사실은 창작하지 말고, 기존 사실의 서술 밀도(동기→과정→결과→성장·확장)를 끌어올려 반영하세요. 최종 세특은 목표 ${t}자의 90~110%(${lo}~${hi}자)를 반드시 지키고 초과 시 핵심을 남기고 압축하세요. 최종 세특 본문만 출력하세요.`;
+}
+
+// 진행 단계 동적 구성: 초안 + 1R(3) + 개선본 + 2R(4) + 최종 = 10스텝
+function preciseSteps(){
+  const R1 = EVALUATORS.slice(0,3), R2 = EVALUATORS.slice();
+  const steps = [{id:"draft", label:"1단계 · 초안 작성 (베테랑 교사)"}];
+  R1.forEach((ev,i)=> steps.push({id:"r1e"+i, label:`2단계(1R·${R1.length}인) · ${ev.name} 평가`}));
+  steps.push({id:"draft2", label:"3단계(1R) · 종합평가위원 개선본 작성"});
+  R2.forEach((ev,i)=> steps.push({id:"r2e"+i, label:`4단계(2R·${R2.length}인) · ${ev.name} 재평가`}));
+  steps.push({id:"final", label:"5단계(2R) · 종합평가위원 최종 작성"});
+  return steps;
+}
+
+/* ---- 정밀 생성 코어 (단일/일괄 공용). 진행표시·출력은 콜백으로 위임 ---- */
+async function runPreciseCore({rawText, fileBlocks, targetLen, onStep, onDelta}){
+  const step = onStep || (()=>{});
+  const delta = onDelta || (()=>{});
+
+  const R1 = EVALUATORS.slice(0,3);   // 1라운드: 학업·진로·공동체 (3인)
+  const R2 = EVALUATORS.slice();      // 2라운드: 3인 + 기재요령·문체 (4인)
+
+  const finalTokens = Math.max(1200, (+targetLen||500) * 3);
+
+  // === 1라운드 ===
+  // 1단계 초안
+  step("draft","run");
+  let draft1;
+  try{
+    draft1 = await callAI({
+      system:SYSTEM_PROMPT,
+      content:[...fileBlocks, {kind:"text", text:rawText}],
+      maxTokens:2000, stream:false
+    });
+    if(!draft1.trim()) throw new Error("초안이 비어 있습니다.");
+    step("draft","done", draft1.length+"자");
+  }catch(e){ step("draft","fail"); throw new Error(`1단계(초안 작성)에서 실패 — ${e.message}`); }
+
+  // 2단계 1R 3인 평가
+  const evals1 = await runEvalRound({idPrefix:"r1e", evaluators:R1, draft:draft1, rawText, fileBlocks, second:false, onStep:step});
+  const ok1 = evals1.filter(r=>r.ok);
+  if(ok1.length===0){
+    const err = new Error(`2단계(1R ${R1.length}인 평가) 전원 실패 — 1단계 초안을 최종 결과로 표시합니다.`);
+    err.partial = {text:draft1, evals1, draft1, evals2:null, draft2:null};
+    throw err;
+  }
+
+  // 3단계 1R 종합평가위원 개선본 (non-streaming)
+  step("draft2","run");
+  let draft2;
+  try{
+    const chairMsg1 = buildChairMsg({rawText, draft:draft1, oks:ok1, final:false, targetLen});
+    draft2 = await callAI({
+      system:CHAIR_PROMPT,
+      content:[...fileBlocks, {kind:"text", text:chairMsg1}],
+      maxTokens:finalTokens, stream:false
+    });
+    if(!draft2.trim()) throw new Error("개선본이 비어 있습니다.");
+    step("draft2","done", draft2.length+"자");
+    delta("✓ 1라운드 개선본 완성 — 2라운드 재평가 진행 중…\n\n" + draft2);
+  }catch(e){ step("draft2","fail"); throw new Error(`3단계(1R 개선본 작성)에서 실패 — ${e.message}`); }
+
+  // === 2라운드 ===
+  // 4단계 2R 4인 재평가 (기재요령 포함, 1차 지적은 이름으로 매칭)
+  const evals2 = await runEvalRound({idPrefix:"r2e", evaluators:R2, draft:draft2, rawText, fileBlocks, second:true, prevEvals:evals1, onStep:step});
+  const ok2 = evals2.filter(r=>r.ok);
+  if(ok2.length===0){
+    const err = new Error(`4단계(2R ${R2.length}인 재평가) 전원 실패 — 1라운드 개선본을 최종 결과로 표시합니다.`);
+    err.partial = {text:draft2, evals1, draft1, evals2, draft2};
+    throw err;
+  }
+
+  // 5단계 2R 종합평가위원 최종본 (스트리밍)
+  step("final","run");
+  delta("");
+  let finalText;
+  try{
+    const chairMsg2 = buildChairMsg({rawText, draft:draft2, oks:ok2, final:true, prevOks:ok1, targetLen});
+    finalText = await callAI({
+      system:CHAIR_PROMPT,
+      content:[...fileBlocks, {kind:"text", text:chairMsg2}],
+      maxTokens:finalTokens, stream:true,
+      onDelta:t => { delta(t); }
+    });
+    if(!finalText.trim()) throw new Error("최종본이 비어 있습니다.");
+    step("final","done", finalText.length+"자");
+  }catch(e){ step("final","fail"); throw new Error(`5단계(2R 최종 작성)에서 실패 — ${e.message}`); }
+
+  return {final:finalText, draft1, draft2, evals1, evals2};
+}
+
+/* ---- 정밀 생성 (단일 모드 래퍼) ---- */
+async function generatePrecise(){
+  const out = $("#output");
+  const rawText = buildUserText();
+  const fileBlocks = await buildFileBlocks();
+  setupProgress(preciseSteps());
+  const targetLen = $("#targetLen").value;
+  try{
+    const r = await runPreciseCore({
+      rawText, fileBlocks, targetLen,
+      onStep:(id,state,sub) => setStep(id,state,sub),
+      onDelta:t => { out.textContent = t; }
+    });
+    finishCount(r.final);
+    renderReview({evals1:r.evals1, draft1:r.draft1, evals2:r.evals2, draft2:r.draft2});
+  }catch(e){
+    if(e.partial){
+      out.textContent = e.partial.text; finishCount(e.partial.text);
+      renderReview({evals1:e.partial.evals1, draft1:e.partial.draft1, evals2:e.partial.evals2, draft2:e.partial.draft2});
+    }
+    throw e;
+  }
+}
+
+/* ---- 평가 과정 보기 ---- */
+function esc(s){ return String(s).replace(/[&<>]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c])); }
+function evalCardHtml(r){
+  if(!r.ok){
+    return `<div class="evalcard"><h4>${esc(r.name)} <span class="sc">평가 실패</span></h4>
+      <div class="efail">오류: ${esc(r.error||"알 수 없음")}</div></div>`;
+  }
+  const st = r.strengths.length ? `<div class="lbl">강점</div><ul>${r.strengths.map(s=>`<li>${esc(s)}</li>`).join("")}</ul>` : "";
+  const im = r.improvements.length ? `<div class="lbl">개선 지시</div><ul>${r.improvements.map(s=>`<li>${esc(s)}</li>`).join("")}</ul>` : "";
+  const tp = (r.to_perfect && r.to_perfect.length) ? `<div class="lbl">100점을 위해</div><ul>${r.to_perfect.map(s=>`<li>${esc(s)}</li>`).join("")}</ul>` : "";
+  return `<div class="evalcard"><h4>${esc(r.name)} <span class="sc">${r.score!=null?r.score+"점":"점수 없음"}</span></h4>${st}${im}${tp}</div>`;
+}
+function avgScore(arr){
+  const s = (arr||[]).filter(r=>r.score!=null);
+  return s.length ? Math.round(s.reduce((a,r)=>a+r.score,0)/s.length) : null;
+}
+function renderReview({evals1, draft1, evals2, draft2}, targetEl){
+  const box = targetEl || $("#reviewBox");
+  const a1 = avgScore(evals1), a2 = avgScore(evals2);
+  const secStyle = "font-size:13px;font-weight:700;color:var(--purple);margin:14px 0 4px;padding-top:8px;border-top:1px dashed var(--line)";
+
+  const badge = (a2!=null)
+    ? `<div class="badge">1차 평균 ${a1!=null?a1:"–"}점 → 2차 평균 ${a2}점</div>`
+    : `<div class="badge">1차 평균 ${a1!=null?a1:"–"}점</div>`;
+
+  const round1cards = evals1.map(evalCardHtml).join("");
+  const round2cards = (evals2 && evals2.length)
+    ? evals2.map(evalCardHtml).join("")
+    : `<div class="hint">2라운드 재평가가 진행되지 않았습니다.</div>`;
+
+  box.innerHTML =
+    `<details class="review" open>
+      <summary>🏛️ 평가 과정 보기 (2라운드 평가위원회)</summary>
+      ${badge}
+      <div style="${secStyle}">1라운드</div>
+      <details class="sub">
+        <summary>📄 1단계 초안 전문 보기</summary>
+        <div class="draftbox">${esc(draft1)}</div>
+      </details>
+      ${round1cards}
+      <div style="${secStyle}">2라운드</div>
+      ${draft2 ? `<details class="sub">
+        <summary>📄 1라운드 개선본 전문 보기</summary>
+        <div class="draftbox">${esc(draft2)}</div>
+      </details>` : ""}
+      ${round2cards}
+    </details>`;
+}
+
+/* ---- 글자수 / 복사 / 오류 ---- */
+function finishCount(text){
+  const n = text.length, target = +$("#targetLen").value;
+  const c = $("#counter"); c.style.display="block";
+  const over = n > target*1.1;
+  c.className = "cnt mt14"+(over?" over":"");
+  c.innerHTML = `글자 수 <b>${n}</b>자 / 목표 ${target}자`;
+  $("#copyBtn").style.display="inline-block";
+}
+$("#copyBtn").onclick = () => {
+  navigator.clipboard.writeText($("#output").textContent).then(()=>{
+    $("#copyBtn").textContent="복사됨 ✓"; setTimeout(()=>$("#copyBtn").textContent="복사",1500);
+  });
+};
+function showErr(m){ $("#errBox").innerHTML=`<div class="err">${m}</div>`; }
+
+/* ================================================================
+   일괄(배치) 생성 모드
+   ================================================================ */
+let genMode = "single";
+let students = [];
+let batchAbort = false, batchRunning = false, lastBatchMode = "quick";
+let stuSeq = 0;
+
+const AREA_NAMES = {자율:"자율활동", 진로:"진로활동", 동아리:"동아리활동"};
+/* 속성값 삽입용 이스케이프 (esc + 따옴표) */
+function escAttr(s){ return esc(s==null?"":s).replace(/"/g,"&quot;"); }
+
+function newStudent(){
+  return {
+    id: "s" + (++stuSeq) + "_" + Date.now().toString(36),
+    name:"", kind:"교과", subject:"", area:"자율", areaDetail:"",
+    quality:"", refText:"", files:[], targetLen:500,
+    result:null, evals:null, status:"대기", error:null, collapsed:false
+  };
+}
+function syncStudentLen(st){
+  st.targetLen = (st.kind==="비교과" && st.area==="진로") ? 700 : 500;
+}
+function studentLabel(st, i){ return st.name || ("학생" + (i+1)); }
+function studentTarget(st){
+  if(st.kind==="교과") return "교과 · " + (st.subject || "(과목 미기재)");
+  return "비교과 · " + (AREA_NAMES[st.area] || st.area) + (st.areaDetail ? " (" + st.areaDetail + ")" : "");
+}
+function statusIcon(s){
+  return s==="완료" ? "✅" : s==="실패" ? "❌" : s==="진행" ? "🔄" : "⏳";
+}
+
+/* ---- 모드 전환 ---- */
+const SINGLE_ELS = ["#card2","#card3","#card4","#singleGenRow","#singleHint","#resultCard"];
+const BATCH_ELS  = ["#batchCard","#batchRunRow","#batchStatusCard","#batchResultCard"];
+function applyGenMode(){
+  const isB = genMode==="batch";
+  SINGLE_ELS.forEach(sel => { const el = $(sel); if(el) el.classList.toggle("hidden", isB); });
+  BATCH_ELS.forEach(sel => { const el = $(sel); if(el) el.classList.toggle("hidden", !isB); });
+  const pc = $("#progressCard");
+  if(pc) pc.classList.toggle("hidden", isB || !progressShown);
+}
+
+/* ---- 학생 카드 렌더 ---- */
+function renderStudents(){
+  const wrap = $("#studentList"); if(!wrap) return;
+  wrap.innerHTML = "";
+  students.forEach((st, i) => {
+    const d = document.createElement("div");
+    d.className = "stucard";
+    d.innerHTML =
+      `<div class="stuhead">
+         <span class="cv">${st.collapsed ? "▶" : "▼"}</span>
+         <b class="tt">${esc(studentLabel(st,i))}</b>
+         <span class="stbadge">${statusIcon(st.status)} ${esc(st.status)}</span>
+         <span class="rm" title="이 학생 삭제">✕</span>
+       </div>
+       <div class="stubody${st.collapsed ? " hidden" : ""}">
+         <label>식별자 (이름/학번)
+           <span class="hint" style="display:inline">선택 입력 · 결과 정리와 파일명에만 쓰이며 AI에는 전달되지 않습니다</span></label>
+         <input type="text" class="f-name" value="${escAttr(st.name)}" placeholder="예: 1반 03 김OO">
+
+         <label class="mt14">구분</label>
+         <div class="seg s-kind">
+           <button data-v="교과"${st.kind==="교과" ? ' class="on"' : ""}>교과 (과목 세특)</button>
+           <button data-v="비교과"${st.kind==="비교과" ? ' class="on"' : ""}>비교과 (창의적 체험활동)</button>
+         </div>
+
+         <div class="b-subject mt14${st.kind==="교과" ? "" : " hidden"}">
+           <label>과목명</label>
+           <input type="text" class="f-subject" list="subjectList" value="${escAttr(st.subject)}"
+                  placeholder="예: 통합사회, 미적분, 영어Ⅰ, 생명과학Ⅱ …">
+         </div>
+
+         <div class="b-area mt14${st.kind==="비교과" ? "" : " hidden"}">
+           <label>비교과 영역</label>
+           <div class="seg s-area">
+             <button data-v="자율" data-len="500"${st.area==="자율" ? ' class="on"' : ""}>자율활동</button>
+             <button data-v="진로" data-len="700"${st.area==="진로" ? ' class="on"' : ""}>진로활동</button>
+             <button data-v="동아리" data-len="500"${st.area==="동아리" ? ' class="on"' : ""}>동아리활동</button>
+           </div>
+           <input type="text" class="f-areaDetail mt14" value="${escAttr(st.areaDetail)}"
+                  placeholder="세부 활동/동아리명 (예: 학급 자치회, 과학탐구동아리 'OO')">
+         </div>
+
+         <label class="mt14">학생의 정성적 특성</label>
+         <textarea class="f-quality" placeholder="수업/활동에서 드러난 학습 태도·강점을 구체적으로">${esc(st.quality)}</textarea>
+
+         <label class="mt14">참고 자료 · 파일 첨부
+           <span class="hint" style="display:inline">이 학생에게만 적용됩니다</span></label>
+         <div class="files fz">
+           <p>📎 클릭하거나 파일을 끌어다 놓으세요<br><span style="font-size:12px">보고서·발표자료·활동지 등</span></p>
+           <input type="file" id="f_${escAttr(st.id)}" class="fin" multiple
+                  accept=".pdf,.txt,.md,.png,.jpg,.jpeg,.webp,.gif" style="display:none">
+         </div>
+         <div class="filelist flist"></div>
+
+         <label class="mt14">또는 텍스트 직접 입력</label>
+         <textarea class="f-refText" placeholder="산출물 내용을 직접 붙여넣어도 됩니다.">${esc(st.refText)}</textarea>
+       </div>`;
+    wrap.appendChild(d);
+    wireStudentCard(d, st, i);
+  });
+  scheduleSave();
+}
+
+function wireStudentCard(d, st, i){
+  const head = d.querySelector(".stuhead");
+  head.onclick = e => {
+    if(e.target.classList.contains("rm")) return;
+    st.collapsed = !st.collapsed; renderStudents();
+  };
+  head.querySelector(".rm").onclick = e => {
+    e.stopPropagation();
+    if(students.length <= 1){ showBatchErr("학생은 최소 1명 이상 필요합니다."); return; }
+    students.splice(i,1); renderStudents(); renderBatchTable();
+  };
+
+  const nameEl = d.querySelector(".f-name");
+  nameEl.oninput = () => {
+    st.name = nameEl.value;
+    head.querySelector(".tt").textContent = studentLabel(st, i);
+    renderBatchTable(); scheduleSave();
+  };
+
+  d.querySelectorAll(".s-kind button").forEach(b => b.onclick = () => {
+    d.querySelectorAll(".s-kind button").forEach(x => x.classList.remove("on"));
+    b.classList.add("on"); st.kind = b.dataset.v;
+    d.querySelector(".b-subject").classList.toggle("hidden", st.kind!=="교과");
+    d.querySelector(".b-area").classList.toggle("hidden", st.kind!=="비교과");
+    syncStudentLen(st); renderBatchTable(); scheduleSave();
+  });
+  d.querySelectorAll(".s-area button").forEach(b => b.onclick = () => {
+    d.querySelectorAll(".s-area button").forEach(x => x.classList.remove("on"));
+    b.classList.add("on"); st.area = b.dataset.v;
+    syncStudentLen(st); renderBatchTable(); scheduleSave();
+  });
+
+  const bind = (sel, key, after) => {
+    const el = d.querySelector(sel); if(!el) return;
+    el.oninput = () => { st[key] = el.value; if(after) after(); scheduleSave(); };
+  };
+  bind(".f-subject", "subject", renderBatchTable);
+  bind(".f-areaDetail", "areaDetail", renderBatchTable);
+  bind(".f-quality", "quality");
+  bind(".f-refText", "refText");
+
+  // 학생별 독립 파일 (전역 files와 공유하지 않음)
+  const fz = d.querySelector(".fz"), fin = d.querySelector(".fin"), flist = d.querySelector(".flist");
+  fz.onclick = e => { if(e.target === fin) return; fin.click(); };
+  fz.ondragover = e => { e.preventDefault(); fz.style.borderColor = "var(--brand)"; };
+  fz.ondragleave = () => fz.style.borderColor = "";
+  fz.ondrop = e => {
+    e.preventDefault(); fz.style.borderColor = "";
+    for(const f of e.dataTransfer.files) st.files.push(f);
+    renderStudentFiles(flist, st);
+  };
+  fin.onchange = () => {
+    for(const f of fin.files) st.files.push(f);
+    fin.value = ""; renderStudentFiles(flist, st);
+  };
+  renderStudentFiles(flist, st);
+}
+
+function renderStudentFiles(el, st){
+  el.innerHTML = "";
+  st.files.forEach((f, idx) => {
+    const row = document.createElement("div"); row.className = "fileitem";
+    row.innerHTML = `<span>${fileIcon(f)}</span><span class="nm">${esc(f.name)}</span>
+      <span style="color:var(--sub);font-size:12px">${(f.size/1024).toFixed(0)}KB</span>
+      <span class="x">✕</span>`;
+    row.querySelector(".x").onclick = () => { st.files.splice(idx,1); renderStudentFiles(el, st); };
+    el.appendChild(row);
+  });
+}
+
+/* ---- 진행표 ---- */
+function studentScore(st){
+  return (st.evals && st.evals.evals2) ? avgScore(st.evals.evals2) : null;
+}
+function renderBatchTable(){
+  const box = $("#batchTableBox"); if(!box) return;
+  const okN = students.filter(s => s.status==="완료").length;
+  const failN = students.filter(s => s.status==="실패").length;
+  const sum = $("#batchSummary");
+  if(sum) sum.innerHTML =
+    `<b>${okN + failN} / ${students.length}</b> 완료 · 성공 <b style="color:var(--ok)">${okN}</b> · 실패 <b style="color:var(--warn)">${failN}</b>`;
+
+  let rows = "";
+  students.forEach((st, i) => {
+    const sc = studentScore(st);
+    rows +=
+      `<tr>
+        <td>${esc(studentLabel(st,i))}</td>
+        <td>${esc(studentTarget(st))}</td>
+        <td>${statusIcon(st.status)} ${esc(st.status)}${st.error ? `<div class="rowerr">${esc(st.error)}</div>` : ""}</td>
+        <td>${sc!=null ? sc + "점" : "–"}</td>
+        <td>${st.result ? st.result.length + "자" : "–"}</td>
+        <td>${st.result ? `<button class="copybtn vbtn" data-i="${i}">보기</button>` : "–"}</td>
+      </tr>`;
+  });
+  box.innerHTML =
+    `<table class="btable">
+      <thead><tr><th>식별자</th><th>구분/과목</th><th>상태</th><th>점수</th><th>글자수</th><th>보기</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+  box.querySelectorAll(".vbtn").forEach(b => b.onclick = () => showBatchResult(+b.dataset.i));
+}
+
+/* ---- 개별 결과 보기 ---- */
+function showBatchResult(i){
+  const st = students[i]; if(!st || !st.result) return;
+  const panel = $("#batchResultPanel");
+  panel.innerHTML =
+    `<div class="outbar">
+       <h2 style="margin:0">📄 ${esc(studentLabel(st,i))} · 생성 결과</h2>
+       <button class="copybtn" id="batchCopyBtn">복사</button>
+     </div>
+     <div class="out" id="batchOut"></div>
+     <div class="cnt mt14" id="batchCnt"></div>
+     <div id="batchReview"></div>`;
+  $("#batchOut").textContent = st.result;
+  const n = st.result.length, target = +st.targetLen || 500;
+  const c = $("#batchCnt");
+  c.className = "cnt mt14" + (n > target*1.1 ? " over" : "");
+  c.innerHTML = `글자 수 <b>${n}</b>자 / 목표 ${target}자`;
+  $("#batchCopyBtn").onclick = () => navigator.clipboard.writeText(st.result).then(() => {
+    $("#batchCopyBtn").textContent = "복사됨 ✓";
+    setTimeout(() => $("#batchCopyBtn").textContent = "복사", 1500);
+  });
+  if(st.evals && st.evals.evals1){
+    renderReview({evals1:st.evals.evals1, draft1:st.evals.draft1, evals2:st.evals.evals2, draft2:st.evals.draft2}, $("#batchReview"));
+  }
+  panel.scrollIntoView({behavior:"smooth", block:"nearest"});
+}
+
+/* ---- 배치 실행 ---- */
+function showBatchErr(m){
+  const el = $("#batchErr"); if(!el) return;
+  el.innerHTML = m ? `<div class="err">${esc(m)}</div>` : "";
+}
+function setBatchBusy(on){
+  const qb = $("#batchQuickBtn"), pb = $("#batchPreciseBtn"), rb = $("#batchRetryBtn");
+  [qb, pb, rb].forEach(b => { if(b) b.disabled = on; });
+  if(on){
+    qb.innerHTML = '<span class="spin"></span> 일괄 생성 중…';
+    pb.innerHTML = '<span class="spin"></span> 평가위원회 일괄 진행 중…';
+  } else {
+    qb.innerHTML = '⚡ 일괄 빠른 생성';
+    pb.innerHTML = '🏆 일괄 정밀 생성';
+    const sb = $("#batchStopBtn"); if(sb) sb.textContent = "⏹ 중단";
+  }
+}
+/* ---- 학생 간 페이싱 (간격 대기) ---- */
+/* 한 학생 처리에 필요한 호출 수를 실효 RPM으로 나눈 자동 간격(초) */
+function autoIntervalSec(mode){
+  try{
+    if(curProvider === "anthropic") return 0;        // Anthropic은 자동 대기 없음
+    const callsPerStudent = (mode === "precise") ? 10 : 1;
+    let rpm = 0, keys = 1;
+    try{ rpm = +(getRateCfg().rpm) || 0; }catch(e){ rpm = 0; }
+    try{ keys = Math.max(1, getKeyPool().length); }catch(e){ keys = 1; }
+    const effectiveRPM = rpm * keys;
+    if(!isFinite(effectiveRPM) || effectiveRPM <= 0) return 0;
+    return Math.ceil(callsPerStudent / effectiveRPM * 60);
+  }catch(e){ return 0; }
+}
+/* 실제 적용 간격(초): manual이면 사용자 입력, 아니면 자동값 */
+function effectivePaceSec(mode){
+  try{
+    const sel = $("#paceMode");
+    if(sel && sel.value === "manual"){
+      const v = Math.floor(+($("#paceSec") ? $("#paceSec").value : 0));
+      return (isFinite(v) && v > 0) ? v : 0;
+    }
+  }catch(e){}
+  return autoIntervalSec(mode);
+}
+function getPaceCfg(){
+  let mode = "auto", sec = 0;
+  try{
+    const sel = $("#paceMode");
+    if(sel && sel.value === "manual") mode = "manual";
+    const v = Math.floor(+($("#paceSec") ? $("#paceSec").value : 0));
+    if(isFinite(v) && v > 0) sec = v;
+  }catch(e){}
+  return {mode, sec};
+}
+function updatePaceInfo(){
+  const el = $("#paceInfo"); if(!el) return;
+  const sel = $("#paceMode");
+  const manual = !!(sel && sel.value === "manual");
+  const wrap = $("#paceSecWrap"); if(wrap) wrap.classList.toggle("hidden", !manual);
+  let txt;
+  if(manual){
+    const s = effectivePaceSec("quick");             // 수동값은 모드와 무관
+    txt = s <= 0 ? "대기 없음 (연속 처리)" : `수동: ${s}초 — 약 ${(60/s).toFixed(1)}명/분`;
+  } else {
+    const q = autoIntervalSec("quick"), p = autoIntervalSec("precise");
+    if(q <= 0 && p <= 0){
+      txt = "대기 없음 (연속 처리)";
+    } else {
+      let eff = 0;
+      try{ eff = (+(getRateCfg().rpm) || 0) * Math.max(1, getKeyPool().length); }catch(e){ eff = 0; }
+      txt = `자동: 빠른 ${q}초 / 정밀 ${p}초 (실효 RPM ${eff})`
+          + (p > 0 ? ` — 정밀 약 ${(60/p).toFixed(1)}명/분` : "");
+    }
+  }
+  el.textContent = txt;
+}
+function setPaceCountdown(txt){
+  const el = $("#paceCountdown"); if(el) el.textContent = txt || "";
+}
+/* 취소 가능한 대기: 중단 요청 시 false */
+async function pacedWait(ms, onTick){
+  const end = Date.now() + ms;
+  while(true){
+    if(batchAbort) return false;
+    const left = end - Date.now();
+    if(left <= 0) return true;
+    onTick && onTick(Math.ceil(left/1000));
+    await sleep(Math.min(250, left));
+  }
+}
+
+/* 모든 키의 일일 한도 소진 감지 */
+function isQuotaExhausted(msg){
+  const m = String(msg || "");
+  if(m.indexOf("모든 API 키가 일일 한도를 소진") >= 0) return true;
+  return /RESOURCE_EXHAUSTED/i.test(m) && /per ?day|perday|daily|requests per day|일일/i.test(m);
+}
+
+async function runBatch(bmode, onlyPending){
+  if(batchRunning) return;
+  if(!apiKeyEl.value.trim()){ showBatchErr("API 키를 입력해 주세요."); return; }
+  if(!getModel()){ showBatchErr("모델을 선택하거나 직접 입력해 주세요."); return; }
+
+  const targets = students.map((s, i) => ({s, i})).filter(({s}) => onlyPending ? s.status!=="완료" : true);
+  if(!targets.length){ showBatchErr(onlyPending ? "재시도할 학생이 없습니다. (모두 완료)" : "학생을 추가해 주세요."); return; }
+
+  const per = bmode==="precise" ? 10 : 1;
+  const label = bmode==="precise" ? "정밀 생성" : "빠른 생성";
+  const intervalSec = effectivePaceSec(bmode);
+  const intervalMs = intervalSec * 1000;
+  let confMsg;
+  if(intervalSec > 0 && targets.length > 1){
+    const estMin = Math.ceil(intervalSec * (targets.length - 1) / 60);
+    confMsg = `학생 ${targets.length}명 × ${label}(${per}회), 예상 API 호출 ${targets.length*per}회`
+            + ` · 학생 간 간격 ${intervalSec}초 → 예상 약 ${estMin}분. 진행할까요?`;
+  } else {
+    confMsg = `학생 ${targets.length}명 × ${label}, 예상 API 호출 ${targets.length}×${per} = ${targets.length*per}회. 진행할까요?`;
+  }
+  if(!confirm(confMsg)) return;
+
+  lastBatchMode = bmode;
+  batchAbort = false; batchRunning = true;
+  showBatchErr("");
+  $("#batchStopBtn").classList.remove("hidden");
+  setBatchBusy(true);
+
+  if(!onlyPending) targets.forEach(({s}) => { s.status = "대기"; s.error = null; });
+  renderBatchTable();
+
+  // 순차 처리 (동시 실행 금지 — Gemini 리미터는 callAI 내부에서 적용됨)
+  setPaceCountdown("");
+  for(let ti = 0; ti < targets.length; ti++){
+    if(batchAbort) break;
+    const s = targets[ti].s;
+    const lastStart = Date.now();
+    s.status = "진행"; s.error = null; renderBatchTable();
+    try{
+      const rawText = buildUserTextFrom(s);
+      const fileBlocks = await buildFileBlocksFrom(s.files);
+      if(bmode==="quick"){
+        s.result = await runQuickCore({rawText, fileBlocks});
+        s.evals = null;
+      } else {
+        const r = await runPreciseCore({rawText, fileBlocks, targetLen:s.targetLen});
+        s.result = r.final;
+        s.evals = {evals1:r.evals1, evals2:r.evals2, draft1:r.draft1, draft2:r.draft2};
+      }
+      s.status = "완료"; s.error = null;
+    }catch(e){
+      if(e.partial && e.partial.text){       // 부분 결과라도 보존
+        s.result = e.partial.text;
+        s.evals = {evals1:e.partial.evals1, evals2:e.partial.evals2, draft1:e.partial.draft1, draft2:e.partial.draft2};
+      }
+      s.status = "실패"; s.error = e.message;
+      if(isQuotaExhausted(e.message)){
+        showBatchErr("모든 API 키의 일일 한도가 소진되었습니다. 여기까지의 결과를 지금 저장(내려받기/JSON 내보내기)하세요.");
+        batchAbort = true;                   // 자동 일시정지 — 남은 학생은 '대기' 유지
+        renderBatchTable(); saveBatchState();
+        break;
+      }
+    }
+    renderBatchTable(); saveBatchState();
+
+    // start-to-start 페이싱: 마지막 학생 뒤에는 대기하지 않음
+    if(!batchAbort && intervalMs > 0 && ti < targets.length - 1){
+      const waitMs = (lastStart + intervalMs) - Date.now();
+      if(waitMs > 0){
+        const ok = await pacedWait(waitMs, n => setPaceCountdown(`⏱ 다음 학생까지 ${n}초 대기 중…`));
+        setPaceCountdown("");
+        if(!ok) break;
+      }
+    }
+  }
+
+  setPaceCountdown("");
+  batchRunning = false;
+  $("#batchStopBtn").classList.add("hidden");
+  setBatchBusy(false);
+  renderBatchTable(); saveBatchState();
+}
+
+/* ---- 저장 / 복원 ---- */
+const SER_FIELDS = ["id","name","kind","subject","area","areaDetail","quality","refText",
+                    "targetLen","result","evals","status","error"];
+function serializeStudents(){
+  return students.map(s => { const o = {}; SER_FIELDS.forEach(k => o[k] = s[k]); return o; });
+}
+let saveTimer = null;
+function scheduleSave(){ clearTimeout(saveTimer); saveTimer = setTimeout(saveBatchState, 400); }
+function saveBatchState(){
+  try{ localStorage.setItem("batchState", JSON.stringify({v:1, students:serializeStudents(), pace:getPaceCfg()})); }
+  catch(e){ /* 용량 초과 등은 무시 */ }
+}
+function studentsFromRaw(arr){
+  return arr.map(x => Object.assign(newStudent(), x, {files:[], collapsed:true}));
+}
+function loadBatchState(){
+  try{
+    const raw = localStorage.getItem("batchState"); if(!raw) return false;
+    const o = JSON.parse(raw);
+    // 페이싱 설정 복원 (없으면 auto 기본 — 하위호환)
+    try{
+      const p = (o && o.pace) || null;
+      const sel = $("#paceMode"), secEl = $("#paceSec");
+      if(sel) sel.value = (p && p.mode === "manual") ? "manual" : "auto";
+      if(secEl && p && isFinite(+p.sec)) secEl.value = Math.max(0, Math.floor(+p.sec));
+      updatePaceInfo();
+    }catch(e){}
+    const arr = Array.isArray(o) ? o : (o && o.students);
+    if(!Array.isArray(arr) || !arr.length) return false;
+    students = studentsFromRaw(arr);
+    return true;
+  }catch(e){ return false; }
+}
+
+/* ---- 내려받기 / 내보내기 ---- */
+function dlBlob(content, filename, mime){
+  const b = new Blob([content], {type:mime});
+  const u = URL.createObjectURL(b);
+  const a = document.createElement("a");
+  a.href = u; a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(u), 1000);
+}
+function stampNow(){
+  const d = new Date(), p = n => String(n).padStart(2,"0");
+  return `${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}`;
+}
+/* CSV 값 escape: , " 개행 포함 시 "로 감싸고 내부 "는 ""로 이중화 */
+function csvEscape(v){
+  const s = String(v==null ? "" : v);
+  return /[",\r\n]/.test(s) ? '"' + s.replace(/"/g,'""') + '"' : s;
+}
+function downloadTxt(){
+  let out = "";
+  students.forEach((s, i) => { if(!s.result) return; out += `===== ${studentLabel(s,i)} =====\n${s.result}\n\n`; });
+  if(!out){ showBatchErr("내려받을 결과가 없습니다."); return; }
+  dlBlob(out, `세특_일괄_${stampNow()}.txt`, "text/plain;charset=utf-8");
+}
+function downloadCsv(){
+  const rows = [["식별자","구분","과목/영역","글자수","점수","세특"]];
+  students.forEach((s, i) => {
+    if(!s.result) return;
+    const sc = studentScore(s);
+    rows.push([
+      studentLabel(s, i), s.kind,
+      s.kind==="교과" ? (s.subject||"") : ((AREA_NAMES[s.area]||s.area) + (s.areaDetail ? " / " + s.areaDetail : "")),
+      s.result.length, sc!=null ? sc : "", s.result
+    ]);
+  });
+  if(rows.length === 1){ showBatchErr("내려받을 결과가 없습니다."); return; }
+  const csv = "﻿" + rows.map(r => r.map(csvEscape).join(",")).join("\r\n");   // BOM: 엑셀 호환
+  dlBlob(csv, `세특_일괄_${stampNow()}.csv`, "text/csv;charset=utf-8");
+}
+function exportBatchJson(){
+  dlBlob(JSON.stringify({v:1, students:serializeStudents()}, null, 2),
+         `세특_일괄_${stampNow()}.json`, "application/json");
+}
+function importBatchJson(file){
+  const r = new FileReader();
+  r.onload = () => {
+    try{
+      const o = JSON.parse(r.result);
+      const arr = Array.isArray(o) ? o : (o && o.students);
+      if(!Array.isArray(arr) || !arr.length) throw new Error("학생 데이터가 없습니다.");
+      students = studentsFromRaw(arr);
+      renderStudents(); renderBatchTable(); saveBatchState();
+      $("#batchRestoreNote").classList.remove("hidden");
+      showBatchErr("");
+    }catch(e){ showBatchErr("JSON 불러오기 실패: " + e.message); }
+  };
+  r.onerror = () => showBatchErr("파일을 읽지 못했습니다.");
+  r.readAsText(file);
+}
+
+/* ---- 배치 UI 이벤트 ---- */
+$("#modeSeg").querySelectorAll("button").forEach(b => b.onclick = () => {
+  $("#modeSeg").querySelectorAll("button").forEach(x => x.classList.remove("on"));
+  b.classList.add("on"); genMode = b.dataset.v; applyGenMode();
+});
+$("#addStudentBtn").onclick = () => {
+  students.push(newStudent()); renderStudents(); renderBatchTable();
+};
+$("#batchQuickBtn").onclick = () => runBatch("quick", false);
+$("#batchPreciseBtn").onclick = () => runBatch("precise", false);
+$("#batchRetryBtn").onclick = () => runBatch(lastBatchMode, true);
+$("#batchStopBtn").onclick = () => {
+  batchAbort = true; $("#batchStopBtn").textContent = "중단 요청됨 — 현재 학생 완료 후 정지";
+};
+/* 페이싱 UI 이벤트 (기존 핸들러를 덮어쓰지 않도록 addEventListener 사용) */
+(function wirePaceUI(){
+  const sel = $("#paceMode"), secEl = $("#paceSec");
+  if(sel) sel.addEventListener("change", () => { updatePaceInfo(); scheduleSave(); });
+  if(secEl) secEl.addEventListener("input", () => { updatePaceInfo(); scheduleSave(); });
+  ["#rpm","#tpm","#rpd"].forEach(s => {
+    const el = $(s); if(!el) return;
+    el.addEventListener("input", updatePaceInfo);
+    el.addEventListener("change", updatePaceInfo);
+  });
+  if(typeof apiKeyEl !== "undefined" && apiKeyEl) apiKeyEl.addEventListener("input", updatePaceInfo);
+  const ps = $("#providerSeg");
+  if(ps) ps.querySelectorAll("button").forEach(b => b.addEventListener("click", () => setTimeout(updatePaceInfo, 0)));
+})();
+
+$("#dlTxtBtn").onclick = downloadTxt;
+$("#dlCsvBtn").onclick = downloadCsv;
+$("#exportJsonBtn").onclick = exportBatchJson;
+$("#importJsonBtn").onclick = () => $("#importJsonInput").click();
+$("#importJsonInput").onchange = e => {
+  const f = e.target.files[0]; if(f) importBatchJson(f); e.target.value = "";
+};
+
+/* ---- 배치 초기화 ---- */
+if(loadBatchState()) $("#batchRestoreNote").classList.remove("hidden");
+if(!students.length) students.push(newStudent());
+renderStudents();
+renderBatchTable();
+updatePaceInfo();
+applyGenMode();
+</script>
+</body>
+</html>
