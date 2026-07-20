@@ -61,6 +61,12 @@
     color:var(--sub);transition:.12s}
   .seg button:hover{border-color:var(--brand)}
   .seg button.on{background:var(--brand);border-color:var(--brand);color:#fff}
+  /* 제공자 버튼의 무료/유료 뱃지 */
+  .ptag{display:inline-block;margin-left:5px;padding:1px 6px;border-radius:999px;
+    font-size:11px;font-weight:700;vertical-align:1px;border:1px solid transparent}
+  .ptag.free{background:#e6f4ec;color:var(--ok);border-color:#c6e6d5}
+  .ptag.paid{background:#f3f4f6;color:var(--sub);border-color:var(--line)}
+  .seg button.on .ptag{background:rgba(255,255,255,.22);color:#fff;border-color:rgba(255,255,255,.35)}
   .mt14{margin-top:14px}
   .hidden{display:none}
   .files{border:1.5px dashed var(--line);border-radius:11px;padding:16px;text-align:center;
@@ -162,11 +168,11 @@
     <h2><span class="n">1</span> AI 제공자 · API 키 설정</h2>
     <label>AI 제공자</label>
     <div class="seg" id="providerSeg">
-      <button data-v="anthropic" class="on">Anthropic Claude</button>
-      <button data-v="gemini">Google Gemini</button>
+      <button data-v="gemini" class="on">Google Gemini <span class="ptag free">무료</span></button>
+      <button data-v="anthropic">Anthropic Claude <span class="ptag paid">유료</span></button>
     </div>
 
-    <label class="mt14" id="keyLabel">Anthropic API 키</label>
+    <label class="mt14" id="keyLabel">Google Gemini API 키 (여러 개면 한 줄에 하나씩)</label>
     <div class="apiwrap">
       <div>
         <textarea id="apiKey" class="masked" rows="2" placeholder="sk-ant-..."></textarea>
@@ -367,7 +373,8 @@
 <script>
 const $ = s => document.querySelector(s);
 let kind = "교과", area = "자율", files = [];
-let curProvider = "anthropic";
+/* 기본 제공자는 무료로 쓸 수 있는 Gemini. 직전에 고른 제공자가 있으면 그것을 복원 */
+let curProvider = (localStorage.getItem("lastProvider") === "anthropic") ? "anthropic" : "gemini";
 const keyCache = { anthropic:"", gemini:"" };
 
 /* ================= 제공자 설정 ================= */
@@ -557,6 +564,7 @@ function switchProvider(p){
   keyCache[curProvider] = apiKeyEl.value;               // 현재 입력값 메모리 보존
   if(saveKeyEl.checked) localStorage.setItem(PROVIDERS[curProvider].storeKey, apiKeyEl.value);
   curProvider = p;
+  try{ localStorage.setItem("lastProvider", p); }catch{}   // 다음 방문 시 복원
   applyProviderUI();
   apiKeyEl.value = keyCache[p] || localStorage.getItem(PROVIDERS[p].storeKey) || "";
   updateThroughput();
@@ -581,9 +589,13 @@ apiKeyEl.oninput = () => { persistKey(); updateThroughput(); };
 saveKeyEl.onchange = persistKey;
 ["#rpm","#tpm","#rpd"].forEach(sel => { const el=$(sel); if(el) el.oninput = updateThroughput; });
 
-/* 초기화: 저장된 키 로드 */
+/* 초기화: 제공자 버튼 활성 표시를 curProvider와 맞추고, 그 제공자의 저장된 키를 로드 */
+$("#providerSeg").querySelectorAll("button").forEach(b =>
+  b.classList.toggle("on", b.dataset.v === curProvider));
 applyProviderUI();
-if(localStorage.getItem("anthropicKey")){ apiKeyEl.value = localStorage.getItem("anthropicKey"); saveKeyEl.checked = true; }
+const savedKey = localStorage.getItem(PROVIDERS[curProvider].storeKey);
+if(savedKey){ apiKeyEl.value = savedKey; saveKeyEl.checked = true; }
+updateThroughput();
 
 /* ---- 교과/비교과 ---- */
 $("#kindSeg").querySelectorAll("button").forEach(b => b.onclick = () => {
