@@ -67,8 +67,9 @@
 ## 사용법
 1. 위 배포 주소로 접속하거나, `index.html`을 브라우저로 엽니다.
 2. AI 제공자를 고르고 API 키를 입력합니다.
-   - Anthropic: https://console.anthropic.com/settings/keys
-   - Google AI Studio: https://aistudio.google.com/app/apikey
+   - 키가 없다면 화면의 **"🔑 API 키 발급 방법"** 을 펼치면 제공자별 발급 절차가 단계별로 안내됩니다.
+   - Anthropic: https://console.anthropic.com/settings/keys (유료 · 사용한 만큼 과금)
+   - Google AI Studio: https://aistudio.google.com/app/apikey (무료 등급 사용 가능 · 신용카드 불필요)
 3. 교과/비교과와 과목(또는 영역)을 선택합니다.
 4. 학생의 정성적 특성을 적고, 산출물을 첨부합니다.
 5. **빠른 생성** 또는 **정밀 생성**을 실행합니다.

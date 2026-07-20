@@ -37,6 +37,22 @@
     padding:12px;font-size:12.5px;color:var(--ink);line-height:1.6}
   details.adv{margin-top:12px}
   details.adv>summary{cursor:pointer;font-size:13px;font-weight:600;color:var(--sub);padding:4px 0}
+  details.keyguide{margin-top:10px;border:1px solid var(--line);border-radius:9px;background:var(--accent);overflow:hidden}
+  details.keyguide>summary{cursor:pointer;font-size:13px;font-weight:700;color:var(--brand-d);padding:10px 12px;list-style:none}
+  details.keyguide>summary::-webkit-details-marker{display:none}
+  details.keyguide>summary::after{content:"▾";float:right;color:var(--sub);font-weight:400}
+  details.keyguide[open]>summary::after{content:"▴"}
+  details.keyguide>summary:hover{color:var(--brand)}
+  .kgbody{padding:0 14px 12px;font-size:12.5px;line-height:1.65;color:var(--ink)}
+  .kgcost{font-weight:700;color:var(--brand-d);margin:0 0 8px}
+  .kgbody ol{margin:0;padding-left:20px}
+  .kgbody ol li{margin-bottom:7px}
+  .kgbody ol li b{color:var(--ink)}
+  .kgtip{margin:8px 0 0;padding:8px 10px;background:#fff;border:1px solid var(--line);border-radius:7px;color:var(--sub)}
+  .kglink{margin:10px 0 0}
+  .kglink a{color:var(--brand);font-weight:600}
+  .kgwarn{margin-top:10px;padding-top:10px;border-top:1px solid #d3e0f4;color:var(--sub);font-size:12px}
+  .kgwarn b{color:var(--warn)}
   .row{display:flex;gap:12px;flex-wrap:wrap}
   .row>div{flex:1;min-width:180px}
   .seg{display:flex;gap:8px;flex-wrap:wrap}
@@ -171,6 +187,21 @@
       </div>
     </div>
     <p class="hint">키는 <a id="keyLink" href="https://console.anthropic.com/settings/keys" target="_blank">console.anthropic.com</a>에서 발급합니다. 키는 서버로 전송되지 않고 브라우저에서 직접 제공자 API로만 전송됩니다.</p>
+
+    <!-- API 키 발급 방법 안내 (제공자별 전환) -->
+    <details class="keyguide" id="keyGuide">
+      <summary>🔑 API 키 발급 방법 — 처음이신가요? 여기를 눌러 펼치기</summary>
+      <div class="kgbody">
+        <p class="kgcost" id="kgCost"></p>
+        <ol id="kgSteps"></ol>
+        <p class="kgtip hidden" id="kgTip"></p>
+        <p class="kglink" id="kgLink"></p>
+        <div class="kgwarn">
+          <b>⚠️ API 키는 비밀번호와 같습니다.</b> 화면 공유·캡처 시 노출되지 않도록 주의하고, 남과 공유하지 마세요.<br>
+          이 앱은 서버가 없으며, 키는 이 브라우저에만 저장되고 선택한 AI 제공자에게만 직접 전송됩니다. 공용 PC에서는 '키 저장'을 체크하지 마세요.
+        </div>
+      </div>
+    </details>
 
     <!-- Gemini 전용: 고급 설정(레이트) -->
     <details class="adv hidden" id="geminiAdv">
@@ -471,8 +502,47 @@ function getModel(){
   return modelEl.value==="__custom__" ? customModelEl.value.trim() : modelEl.value;
 }
 
+/* ---- API 키 발급 안내 (제공자별) ---- */
+const KEY_GUIDE = {
+  anthropic: {
+    cost: "유료입니다 — 사용한 만큼 본인 과금됩니다. 품질이 가장 높습니다.",
+    steps: [
+      ["Anthropic Console 접속 & 로그인", "console.anthropic.com에 들어가 계정을 만들고 로그인합니다."],
+      ["결제 수단 등록", "좌측 메뉴 Billing에서 결제 수단을 등록하고 크레딧을 충전합니다. <b>Claude API는 무료 등급이 없어 사용한 만큼 과금됩니다</b>(소액 충전으로 시작 가능)."],
+      ["API 키 만들기", "좌측 메뉴 API keys → \"Create Key\"를 누르고 이름을 정합니다."],
+      ["키 복사 후 붙여넣기", "키는 생성 직후 한 번만 전체가 보이므로 즉시 복사해 위 칸에 붙여넣으세요. 창을 닫으면 다시 볼 수 없습니다."]
+    ],
+    tip: "",
+    link: "https://console.anthropic.com/settings/keys",
+    linkText: "Anthropic Console에서 키 발급하기"
+  },
+  gemini: {
+    cost: "무료 등급으로 사용할 수 있습니다 (신용카드 불필요).",
+    steps: [
+      ["Google AI Studio 접속 & 로그인", "aistudio.google.com에 들어가 구글 계정으로 로그인합니다."],
+      ["열쇠 아이콘 클릭", "화면 왼쪽 맨 아래의 열쇠(🔑) 아이콘을 클릭합니다. ('Get API key' 버튼)"],
+      ["API 키 만들기", "오른쪽 위 \"API 키 만들기\"를 누릅니다. 무료 등급이면 충분합니다(신용카드 불필요)."],
+      ["키 복사 후 붙여넣기", "복사 아이콘을 눌러 키를 복사해 위 칸에 붙여넣으면 끝입니다."]
+    ],
+    tip: "💡 여러 학생을 한 번에 처리하려면 구글 계정을 여러 개 사용해 키를 여러 개 발급받아 <b>한 줄에 하나씩</b> 입력하면 일일 한도가 키 개수만큼 늘어납니다.",
+    link: "https://aistudio.google.com/app/apikey",
+    linkText: "Google AI Studio에서 키 발급하기"
+  }
+};
+
+function updateKeyGuide(){
+  const g = KEY_GUIDE[curProvider]; if(!g) return;
+  const cost = $("#kgCost"), steps = $("#kgSteps"), tip = $("#kgTip"), link = $("#kgLink");
+  if(!cost || !steps) return;
+  cost.textContent = g.cost;
+  steps.innerHTML = g.steps.map(([t,d]) => `<li><b>${t}</b> — ${d}</li>`).join("");
+  if(tip){ tip.innerHTML = g.tip; tip.classList.toggle("hidden", !g.tip); }
+  if(link) link.innerHTML = `<a href="${g.link}" target="_blank" rel="noopener">${g.linkText} ↗</a>`;
+}
+
 function applyProviderUI(){
   const p = PROVIDERS[curProvider];
+  updateKeyGuide();
   $("#keyLabel").textContent = p.label + " (여러 개면 한 줄에 하나씩)";
   apiKeyEl.placeholder = p.placeholder + "  —  여러 개면 한 줄에 하나씩";
   apiKeyEl.classList.add("masked"); $("#toggleKey").textContent = "표시";
