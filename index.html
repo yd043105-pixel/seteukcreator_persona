@@ -114,6 +114,7 @@
   .pstep.run{color:var(--ink)}
   .pstep.done{color:var(--ink)}
   .pstep.fail{color:var(--warn)}
+  .pstep.skip{color:var(--sub);opacity:.6}
   .pstep .ico{width:20px;text-align:center;flex:none}
   .pstep .sub{margin-left:auto;font-size:12px;color:var(--sub)}
   /* 평가 과정 */
@@ -128,6 +129,12 @@
   .evalcard ul{margin:4px 0 0;padding-left:18px}
   .evalcard li{font-size:13px;margin:3px 0;line-height:1.55}
   .evalcard .efail{font-size:12px;color:var(--warn);margin-top:6px}
+  .evalcard .nislbl{font-size:12px;font-weight:700;color:#98a1ad;margin-top:9px}
+  .evalcard ul.nis li{color:#98a1ad}
+  .roundhead{font-size:13px;font-weight:700;color:var(--purple);margin:14px 0 4px;
+    padding-top:8px;border-top:1px dashed var(--line)}
+  .earlynote{background:#e6f4ec;border:1px solid #c6e6d5;color:var(--ok);border-radius:9px;
+    padding:8px 11px;font-size:12.5px;font-weight:600;margin:6px 0 10px}
   .draftbox{white-space:pre-wrap;background:#fff;border:1px solid var(--line);border-radius:9px;
     padding:12px;font-size:14px;line-height:1.7;margin-top:8px}
   details.sub>summary{cursor:pointer;font-size:13px;font-weight:600;color:var(--sub);padding:6px 0}
@@ -161,7 +168,7 @@
 <div class="wrap">
   <header class="top">
     <h1>📝 학생부 종합전형 세특 작성기</h1>
-    <p>Anthropic Claude · Google Gemini 멀티 제공자 지원. 주요 대학 학종 서류평가 기준(학업역량·진로역량·공동체역량)에 맞춰 세특을 생성하며, <b>정밀 생성</b>은 입학사정관 평가위원회(AI 10회 호출)를 통해 완성도를 끌어올립니다. Gemini 다중 키·레이트 리미터로 무료 한도 대량 처리를 지원합니다.</p>
+    <p>Anthropic Claude · Google Gemini 멀티 제공자 지원. 주요 대학 학종 서류평가 기준(학업역량·진로역량·공동체역량)에 맞춰 세특을 생성하며, <b>정밀 생성</b>은 입학사정관 평가위원회(적응형 다중 라운드)를 통해 완성도를 끌어올립니다. Gemini 다중 키·레이트 리미터로 무료 한도 대량 처리를 지원합니다.</p>
   </header>
 
   <!-- 1. 제공자 · API -->
@@ -193,6 +200,22 @@
         <input type="number" id="targetLen" value="500" min="100" max="2000" step="50">
       </div>
     </div>
+    <div class="row mt14">
+      <div>
+        <label>정밀 생성 · 목표 점수 <span class="hint" style="display:inline">(70~100)</span></label>
+        <input type="number" id="targetScore" value="95" min="70" max="100" step="1">
+      </div>
+      <div>
+        <label>정밀 생성 · 최대 라운드</label>
+        <select id="maxRounds">
+          <option value="2">2라운드</option>
+          <option value="3" selected>3라운드</option>
+          <option value="4">4라운드</option>
+        </select>
+      </div>
+    </div>
+    <div class="hint" id="preciseCfgHint"></div>
+
     <p class="hint">키는 <a id="keyLink" href="https://console.anthropic.com/settings/keys" target="_blank">console.anthropic.com</a>에서 발급합니다. 키는 서버로 전송되지 않고 브라우저에서 직접 제공자 API로만 전송됩니다.</p>
 
     <!-- API 키 발급 방법 안내 (제공자별 전환) -->
@@ -264,6 +287,10 @@
     <label>수업/활동에서 드러난 학습 태도·강점</label>
     <textarea id="quality" placeholder="예) 수업 중 질문이 많고 개념을 끝까지 파고드는 편임. 모둠 활동에서 의견을 조율하는 역할을 자주 맡음. 희망 진로는 생명공학 연구원. 발표 자료를 스스로 도식화하여 정리하는 강점이 있음."></textarea>
     <div class="hint">학생이 실제로 보였던 모습을 구체적으로 적을수록 평가기준에 맞는 세특이 나옵니다. (지적 호기심·탐구 태도·협업·성실성·리더십 등)</div>
+
+    <label class="mt14">학생 수준</label>
+    <select id="levelSel"></select>
+    <div class="hint">산출물을 근거로 해당 수준에 맞는 밀도로 작성합니다. 부정적 표현은 사용하지 않습니다.</div>
   </div>
 
   <!-- 4. 참고자료 -->
@@ -346,9 +373,9 @@
   <!-- 생성 버튼 -->
   <div class="genrow" id="singleGenRow">
     <button class="genbtn" id="quickBtn">⚡ 빠른 생성 <span style="font-weight:500;font-size:14px">(AI 1회 호출)</span></button>
-    <button class="genbtn precise" id="preciseBtn">🏆 정밀 생성 — 평가위원회 <span style="font-weight:500;font-size:14px">(AI 10회 호출)</span></button>
+    <button class="genbtn precise" id="preciseBtn">🏆 정밀 생성 — 평가위원회</button>
   </div>
-  <p class="hint" id="singleHint" style="margin-bottom:12px">정밀 생성(2라운드): 초안 작성 → 3인 평가 → 개선본 → 4인 재평가(기재요령 포함) → 최종 작성. 총 약 10회 호출, 토큰 사용량이 10배 이상이며 2~5분 걸릴 수 있습니다.</p>
+  <p class="hint" id="singleHint" style="margin-bottom:12px"></p>
   <div id="errBox"></div>
 
   <!-- 진행 상황 -->
@@ -482,10 +509,13 @@ function updateThroughput(){
   const cfg = getRateCfg();
   const keys = Math.max(1, getKeyPool().length);
   const effRpd = cfg.rpd * keys;
-  const preciseN = Math.floor(effRpd/10), quickN = effRpd;
+  /* EVALUATORS/LEVELS 정의 이전(초기화 시점)에도 호출될 수 있으므로 방어적으로 계산 */
+  let perPrecise = 15;
+  try{ perPrecise = preciseCallCount(); }catch(e){}
+  const preciseN = Math.floor(effRpd/perPrecise), quickN = effRpd;
   $("#geminiInfo").innerHTML =
     `<b>무료 한도 안내</b> · 모델 <b>${esc(getModel()||"-")}</b> 기준 RPM ${cfg.rpm} / TPM ${cfg.tpm.toLocaleString()} / RPD ${cfg.rpd}, 입력 키 <b>${keys}개</b> → 실효 RPD <b>${effRpd.toLocaleString()}</b><br>
-     정밀 생성(10회/명) 기준 <b>하루 약 ${preciseN.toLocaleString()}명</b>, 빠른 생성(1회/명) 기준 <b>하루 약 ${quickN.toLocaleString()}명</b> 처리 가능<br>
+     정밀 생성(최대 ${perPrecise}회/명) 기준 <b>하루 약 ${preciseN.toLocaleString()}명</b>, 빠른 생성(1회/명) 기준 <b>하루 약 ${quickN.toLocaleString()}명</b> 처리 가능<br>
      <span style="color:var(--sub)">대량(수십~120명) 작업은 <b>빠른 생성 + Flash/Flash-Lite 모델 + 다중 키</b>를 권장합니다. 정밀 생성은 무료 한도에서 소수 학생에만 적합합니다.</span>`;
 }
 
@@ -800,6 +830,49 @@ async function buildFileBlocksFrom(fileArr){
   return arr;
 }
 
+/* ================= 학생 수준 5단계 ================= */
+/* 수준은 '서술의 밀도·깊이·표현 강도'만 조절한다. 사실 자체를 바꾸지 않는다. */
+const LEVEL_COMMON = `[학생 수준 적용 공통 원칙 — 반드시 지킬 것]
+- 수준은 서술의 밀도·깊이·표현 강도를 조절하는 기준일 뿐이며, 사실을 바꾸는 기준이 아니다.
+- 수준이 낮다고 해서 부정적·소극적 평가 표현('미흡함', '부족함', '어려워함', '이해하지 못함', '소극적임')을 절대 쓰지 않는다. 학생부는 관찰된 사실과 긍정적 성장을 기록하는 문서이다.
+- 수준이 높다고 해서 산출물에 없는 성취·활동·결과를 창작하지 않는다.`;
+
+function levelEvalNote(label, extra){
+  return `이 세특은 학생 수준 '${label}'로 지정되었습니다. 평가 기준(항목·가중치·엄격함)은 동일하게 유지하되, 그 수준의 학생이 제출한 산출물을 얼마나 충실히 살렸는가를 기준으로 평가하세요. 더 높은 수준의 학생에게 기대할 성취가 없다는 이유로 감점하지 마세요.${extra ? " " + extra : ""}`;
+}
+
+const LEVELS = {
+  auto: { short:"자동", label:"자동 (산출물 기준으로 판단)",
+    writer:"제출된 산출물과 정성적 특성이 실제로 보여주는 수준을 판단하여, 그에 맞는 적절한 밀도와 깊이로 서술한다. 산출물이 보여주는 만큼만 충실히 살리고, 그 이상으로 부풀리거나 그 이하로 축소하지 않는다.",
+    eval: levelEvalNote("자동(산출물 기준)", "산출물이 실제로 담고 있는 수준을 기준으로 판단하세요.") },
+  top: { short:"상", label:"상 (최상위권)",
+    writer:"탐구의 동기 → 설계 → 해석 → 확장이 모두 드러나도록 밀도 높게 서술한다. 수업에서 배운 개념 간의 연결, 자기주도적으로 문제를 정의하고 해결해 나간 과정을 구체적으로 담는다. 다만 과장하거나 미화하지 말고 산출물에 실제로 존재하는 사실만 사용한다.",
+    eval: levelEvalNote("상") },
+  high: { short:"중상", label:"중상 (상위권)",
+    writer:"탐구 과정과 개념 이해를 충실히 서술한다. 심화·확장에 해당하는 서술은 산출물에 근거가 있는 범위에서만 담고, 근거가 없는 심화 표현은 넣지 않는다.",
+    eval: levelEvalNote("중상") },
+  mid: { short:"중", label:"중 (중위권)",
+    writer:"수업에서 배운 개념을 활동에 적용해 나간 과정을 성실하게 서술한다. 무리한 심화·확장 표현 대신 개념을 이해하고 수행해 나간 과정을 구체적으로 담는다.",
+    eval: levelEvalNote("중") },
+  low: { short:"중하", label:"중하",
+    writer:"활동에 참여하며 개념을 이해해 나간 과정과 성실성·태도의 성장을 중심으로 서술한다. 결과의 완성도보다 학생이 기울인 노력과 그 과정에서 나타난 변화에 초점을 둔다.",
+    eval: levelEvalNote("중하") },
+  base: { short:"하", label:"하",
+    writer:"활동에 참여한 구체적인 모습과 학습 의지, 작은 성장을 긍정적으로 서술한다. 학생부는 부정적·평가절하 표현을 쓰지 않으므로 부족한 점을 지적하지 말고, 관찰된 노력과 참여의 사실을 그대로 기록한다.",
+    eval: levelEvalNote("하", "낮은 수준으로 지정되었더라도 부정적 표현이 없는 것을 감점 사유로 삼지 마세요.") }
+};
+const LEVEL_ORDER = ["auto","top","high","mid","low","base"];
+function getLevel(v){ return LEVELS[v] || LEVELS.auto; }
+function levelOptionsHtml(sel){
+  const cur = LEVELS[sel] ? sel : "auto";
+  return LEVEL_ORDER.map(k =>
+    `<option value="${k}"${k===cur?" selected":""}>${LEVELS[k].label}</option>`).join("");
+}
+(function initLevelSel(){
+  const el = document.querySelector("#levelSel");
+  if(el) el.innerHTML = levelOptionsHtml("auto");
+})();
+
 /* ================= 시스템 프롬프트 ================= */
 const SYSTEM_PROMPT = `당신은 대한민국 고등학교 학교생활기록부 작성 경험이 풍부한 담임·교과 교사입니다.
 학생부 종합전형(학종) 서류평가 기준에 정통하며, 주요 대학이 공통으로 사용하는 평가요소에 맞춰 '세부능력 및 특기사항(세특)'을 작성합니다.
@@ -838,9 +911,18 @@ const COMMON_EVAL = `당신은 대한민국 주요 대학 학생부종합전형 
 - '교과 범위를 넘어선', '대학 수준의', '고교 과정을 초월한' 등 교육과정 범위 초과·선행학습을 암시하는 표현을 쓰지 않는다. 심화 탐구는 '교육과정에서 배운 개념을 확장·연결하여'처럼 교육과정 내 심화로 서술한다.
 - improvements에 생성형 AI 활용 언급이나 교과 범위 초과 서술을 추가하라는 지시를 절대 하지 말 것.
 
-제시된 세특 초안을 아래 관점에서 엄격하게 평가하고, 반드시 JSON만 출력하세요: {"score": 100점 만점 정수, "strengths": [강점 배열], "improvements": [구체적인 수정 지시 배열], "to_perfect": ["이 관점에서 100점을 받으려면 반드시 필요한 구체적 서술 …"]}
-to_perfect는 '무엇이 부족한가'가 아니라 '100점짜리 세특이라면 어떤 문장·근거가 들어 있을가'를 실행 가능한 형태(추가·강화할 문장과 근거의 방향)로 작성하세요. 평가 기준(감식안)은 라운드와 무관하게 동일하게 유지합니다.
-반드시 순수 JSON 객체 하나만 출력하세요. 코드블록(\`\`\`), 마크다운, 여는 설명 문장을 절대 붙이지 마세요. strengths·improvements·to_perfect는 각각 최대 3개 항목, 각 항목은 2문장 이내로 간결하게 작성하여 응답이 잘리지 않게 하세요.`;
+[학생 수준 지정에 대한 평가 적용 지침]
+원자료에 [학생 수준]이 지정되어 있습니다. 평가 기준(항목·가중치·엄격함)은 지정 수준과 무관하게 동일하게 유지하되, '그 수준의 학생이 제출한 산출물을 얼마나 충실히 살렸는가'를 기준으로 평가하세요. 더 높은 수준의 학생에게 기대할 성취가 산출물에 없다는 이유로 감점하지 마세요. 또한 낮은 수준으로 지정되었다는 이유로 부정적·평가절하 표현을 추가하라고 지시하지 마세요(학생부 기재 위반입니다).
+
+[improvements와 not_in_source의 구분 — 매우 중요]
+- improvements에는 원자료(산출물·정성적 특성)에 근거가 있는데 서술이 부족하거나 잘못된 것만 넣으세요.
+- 원자료에 아예 근거가 없어 세특에 넣을 수 없는 내용은 improvements가 아니라 not_in_source에 적고, 그것을 이유로 감점하지 마세요.
+- 평가는 '이상적인 세특인가'가 아니라 '주어진 원자료를 최대한 충실히 살렸는가'를 기준으로 합니다. (평가 항목과 가중치는 그대로 유지)
+- to_perfect 역시 원자료에 근거가 있는 범위에서 실행 가능한 항목만 작성하세요.
+
+제시된 세특 초안을 아래 관점에서 엄격하게 평가하고, 반드시 JSON만 출력하세요: {"score": 100점 만점 정수, "strengths": [강점 배열], "improvements": [원자료에 근거가 있는 구체적 수정 지시 배열], "to_perfect": ["이 관점에서 100점을 받으려면 반드시 필요한 구체적 서술 …"], "not_in_source": ["원자료에 근거가 없어 반영 불가능한 항목 — 감점 사유 아님"]}
+to_perfect는 '무엇이 부족한가'가 아니라 '100점짜리 세특이라면 어떤 문장·근거가 들어 있을까'를 실행 가능한 형태(추가·강화할 문장과 근거의 방향)로 작성하세요. 평가 기준(감식안)은 라운드와 무관하게 동일하게 유지합니다.
+반드시 순수 JSON 객체 하나만 출력하세요. 코드블록(\`\`\`), 마크다운, 여는 설명 문장을 절대 붙이지 마세요. strengths·improvements·to_perfect·not_in_source는 각각 최대 3개 항목, 각 항목은 2문장 이내로 간결하게 작성하여 응답이 잘리지 않게 하세요.`;
 
 const EVALUATORS = [
   { name:"학업역량 입학사정관", persona:
@@ -853,7 +935,7 @@ const EVALUATORS = [
     `당신은 교육부 학교생활기록부 기재요령에 정통한 베테랑 교사입니다. 관점: (1) 금지사항 위반 여부 — 수상 실적, 모의고사/석차, 교외 활동, 특정 대학·기관명, 학생 실명, 부모 정보, 어학 성적 등이 있으면 score를 40 이하로 주고 반드시 improvements에 삭제 지시. (2) 문체 — 명사형 종결('~함', '~을 보임', '~하였음')의 일관성, 한 문단 서술형. (3) 구체성 — 행동·과정 중심 서술, 동기→과정→성장 흐름. (4) 분량 — 목표 글자 수 준수. 위반 사항을 구체적으로 지적하세요.` }
 ];
 
-const CHAIR_PROMPT = `당신은 대학 입학사정관실의 종합평가위원장이며 동시에 학교생활기록부 작성 최고 전문가입니다. 세특 초안과 4명의 전문 평가위원(학업역량·진로역량·공동체역량·기재요령)의 평가 결과를 모두 반영하여 최종 완성본 세특을 작성합니다. 원칙: (1) improvements의 수정 지시를 최대한 반영하되 서로 충돌하면 학업역량>진로역량>기재요령>공동체역량 순으로 우선. (2) 명사형 종결 서술형 한 문단. (3) 금지사항 배제. (4) 목표 글자 수(공백 포함)의 90~110% 범위를 반드시 지키고 초과 금지 — 초과 시 핵심을 남기고 압축한다. (5) 학생 원자료에 없는 사실을 새로 지어내지 않기 — 기존 사실의 서술 방식만 개선. (6) 생성형 AI·인공지능 도구·챗봇 활용 언급을 절대 쓰지 않는다(학생이 AI를 썼더라도 세특에 언급 금지). (7) '교과 범위를 넘어선'·'대학 수준의'·'고교 과정을 초월한' 등 교육과정 범위 초과·선행학습 암시 표현을 쓰지 않고, 심화는 '교육과정에서 배운 개념을 확장·연결하여'처럼 교육과정 내 심화로 서술한다. 최종 세특 본문만 출력하세요. 머리말·설명·따옴표 금지.`;
+const CHAIR_PROMPT = `당신은 대학 입학사정관실의 종합평가위원장이며 동시에 학교생활기록부 작성 최고 전문가입니다. 세특 초안과 4명의 전문 평가위원(학업역량·진로역량·공동체역량·기재요령)의 평가 결과를 모두 반영하여 최종 완성본 세특을 작성합니다. 원칙: (1) improvements의 수정 지시를 최대한 반영하되 서로 충돌하면 학업역량>진로역량>기재요령>공동체역량 순으로 우선. (2) 명사형 종결 서술형 한 문단. (3) 금지사항 배제. (4) 목표 글자 수(공백 포함)의 90~110% 범위를 반드시 지키고 초과 금지 — 초과 시 핵심을 남기고 압축한다. (5) 학생 원자료에 없는 사실을 새로 지어내지 않기 — 기존 사실의 서술 방식만 개선. (6) 생성형 AI·인공지능 도구·챗봇 활용 언급을 절대 쓰지 않는다(학생이 AI를 썼더라도 세특에 언급 금지). (7) '교과 범위를 넘어선'·'대학 수준의'·'고교 과정을 초월한' 등 교육과정 범위 초과·선행학습 암시 표현을 쓰지 않고, 심화는 '교육과정에서 배운 개념을 확장·연결하여'처럼 교육과정 내 심화로 서술한다. (8) 원자료에 지정된 [학생 수준]에 맞는 밀도·깊이로 쓰되, 낮은 수준이라도 부정적·평가절하 표현('미흡함', '부족함', '어려워함')을 절대 쓰지 않고, 높은 수준이라도 원자료에 없는 사실을 만들어내지 않는다. 수준은 서술의 밀도를 조절하는 기준이지 사실을 바꾸는 기준이 아니다. (9) '반영 불가(원자료 근거 없음)'으로 표시된 항목은 무리해서 넣지 말고 무시한다. 최종 세특 본문만 출력하세요. 머리말·설명·따옴표 금지.`;
 
 /* ---- 프롬프트 구성 ---- */
 /* 현재 폼 값으로 st를 만들어 buildUserTextFrom에 위임하는 얇은 래퍼 */
@@ -864,7 +946,8 @@ function buildUserText(){
     areaDetail: $("#areaDetail").value,
     quality: $("#quality").value,
     refText: $("#refText").value,
-    targetLen: $("#targetLen").value
+    targetLen: $("#targetLen").value,
+    level: ($("#levelSel") ? $("#levelSel").value : "auto")
   });
 }
 /* st = {kind, subject, area, areaDetail, quality, refText, targetLen} — 식별자(name)는 절대 포함하지 않는다 */
@@ -881,8 +964,15 @@ function buildUserTextFrom(st){
     const names = {자율:"자율활동",진로:"진로활동",동아리:"동아리활동"};
     head = `[구분] 비교과 - ${names[st.area]} 특기사항${detail?`\n[세부 활동] ${detail}`:""}`;
   }
+  const lv = getLevel(st.level);
+  const isAuto = (getLevel(st.level) === LEVELS.auto);
+  const levelBlock = `[학생 수준] ${lv.short}${isAuto ? " — 지정된 수준이 없으므로 산출물의 수준을 보고 판단합니다." : ""}
+${lv.writer}
+${LEVEL_COMMON}`;
   return `${head}
 [목표 글자 수] ${target}자 내외 (공백 포함, 초과 금지)
+
+${levelBlock}
 
 [학생의 정성적 특성 — 수업/활동에서 드러난 학습 태도·강점]
 ${q || "(입력 없음 — 첨부 자료를 근거로 학생의 태도·역량을 합리적으로 추론하여 서술)"}
@@ -928,7 +1018,8 @@ function parseEval(txt){
         score: normScore(o.score),
         strengths: Array.isArray(o.strengths) ? o.strengths.map(String).slice(0,3) : [],
         improvements: Array.isArray(o.improvements) ? o.improvements.map(String).slice(0,3) : [],
-        to_perfect: Array.isArray(o.to_perfect) ? o.to_perfect.map(String).slice(0,3) : []
+        to_perfect: Array.isArray(o.to_perfect) ? o.to_perfect.map(String).slice(0,3) : [],
+        not_in_source: Array.isArray(o.not_in_source) ? o.not_in_source.map(String).slice(0,3) : []
       };
     }catch{}
   }
@@ -937,13 +1028,14 @@ function parseEval(txt){
   const strengths = pickArray(s, "strengths");
   const improvements = pickArray(s, "improvements");
   const to_perfect = pickArray(s, "to_perfect");
-  if(score!=null || strengths.length || improvements.length || to_perfect.length){
-    return { score, strengths, improvements, to_perfect };
+  const not_in_source = pickArray(s, "not_in_source");
+  if(score!=null || strengths.length || improvements.length || to_perfect.length || not_in_source.length){
+    return { score, strengths, improvements, to_perfect, not_in_source };
   }
   // 3) 최후: score만이라도 살리고, raw JSON 덩어리는 노출하지 않음
   const cleaned = s.replace(/[`{}\[\]]/g,"").replace(/"?score"?\s*:\s*\d+\s*,?/i,"")
-                   .replace(/"(strengths|improvements|to_perfect)"\s*:/gi,"").replace(/\s+/g," ").trim();
-  return { score, strengths:[], improvements: cleaned ? [cleaned.slice(0,200)] : [], to_perfect:[] };
+                   .replace(/"(strengths|improvements|to_perfect|not_in_source)"\s*:/gi,"").replace(/\s+/g," ").trim();
+  return { score, strengths:[], improvements: cleaned ? [cleaned.slice(0,200)] : [], to_perfect:[], not_in_source:[] };
 }
 
 /* ================= 진행 상황 UI ================= */
@@ -960,9 +1052,10 @@ function setupProgress(steps){
 }
 function setStep(id, state, sub){
   const el = $("#ps-"+id); if(!el) return;
-  el.classList.remove("run","done","fail");
+  el.classList.remove("run","done","fail","skip");
   const ico = el.querySelector(".ico");
-  if(state==="run"){ el.classList.add("run"); ico.innerHTML='<span class="spin" style="border-color:rgba(107,63,160,.3);border-top-color:var(--purple)"></span>'; }
+  if(state==="skip"){ el.classList.add("skip"); ico.textContent="⏭"; }
+  else if(state==="run"){ el.classList.add("run"); ico.innerHTML='<span class="spin" style="border-color:rgba(107,63,160,.3);border-top-color:var(--purple)"></span>'; }
   else if(state==="done"){ el.classList.add("done"); ico.textContent="✅"; }
   else if(state==="fail"){ el.classList.add("fail"); ico.textContent="❌"; }
   if(sub!==undefined) el.querySelector(".sub").textContent = sub;
@@ -985,8 +1078,29 @@ function setBusy(on, mode){
     else preciseBtn.innerHTML='<span class="spin"></span> 평가위원회 진행 중…';
   } else {
     quickBtn.innerHTML='⚡ 빠른 생성 <span style="font-weight:500;font-size:14px">(AI 1회 호출)</span>';
-    preciseBtn.innerHTML='🏆 정밀 생성 — 평가위원회 <span style="font-weight:500;font-size:14px">(AI 10회 호출)</span>';
+    preciseBtn.innerHTML = preciseBtnLabel();
   }
+}
+
+/* ---- 정밀 생성 설정(목표 점수·최대 라운드) 기반 동적 라벨 ---- */
+function preciseBtnLabel(){
+  const cfg = getPreciseCfg();
+  return `🏆 정밀 생성 — 평가위원회 <span style="font-weight:500;font-size:14px">(AI 최대 ${preciseCallCount(cfg.maxRounds)}회 호출)</span>`;
+}
+function updatePreciseLabels(){
+  const cfg = getPreciseCfg();
+  const maxN = preciseCallCount(cfg.maxRounds), minN = preciseMinCallCount();
+  if(preciseBtn && !preciseBtn.disabled) preciseBtn.innerHTML = preciseBtnLabel();
+  const hint = $("#singleHint");
+  if(hint) hint.textContent =
+    `정밀 생성(최대 ${cfg.maxRounds}라운드): 초안 작성 → 3인 평가 → 개선본 → 4인 재평가(기재요령 포함) → … → 최종 작성. `
+  + `총 최대 ${maxN}회 호출(목표 ${cfg.targetScore}점 달성 시 최소 ${minN}회로 조기 종료). 토큰 사용량이 많고 2~7분 걸릴 수 있습니다.`;
+  const ch = $("#preciseCfgHint");
+  if(ch) ch.textContent =
+    `평가 항목·가중치는 그대로 두고, 평균 점수가 목표에 도달할 때까지 라운드를 반복합니다. `
+  + `최대 ${cfg.maxRounds}라운드 = 최대 ${maxN}회 호출, 목표 달성 시 최소 ${minN}회로 조기 종료합니다. (단일·일괄 모드 공용)`;
+  try{ updateThroughput(); }catch(e){}
+  try{ updatePaceInfo(); }catch(e){}
 }
 
 async function run(mode){
@@ -1032,13 +1146,41 @@ async function generateQuick(){
   }
 }
 
-/* ---- 정밀 생성 (2라운드 평가위원회) ---- */
+/* ---- 정밀 생성 (적응형 다중 라운드 평가위원회) ---- */
 
-// 평가 라운드 실행. evaluators: 이번 라운드 평가자 배열. second=true면 1차 지적을 이름(name)으로 매칭해 전달.
-async function runEvalRound({idPrefix, evaluators, draft, rawText, fileBlocks, second, prevEvals, onStep}){
+/* 라운드별 평가자: 1라운드 3인, 2라운드 이후 4인(기재요령 포함) */
+function roundEvaluators(r){ return r===1 ? EVALUATORS.slice(0,3) : EVALUATORS.slice(); }
+function clampNum(v, lo, hi, dflt){
+  const n = Math.round(+v);
+  if(!isFinite(n)) return dflt;
+  return Math.min(hi, Math.max(lo, n));
+}
+/* 정밀 생성 설정 (목표 점수 / 최대 라운드) — 단일·일괄 공용 */
+function getPreciseCfg(){
+  const tsEl = $("#targetScore"), mrEl = $("#maxRounds");
+  return {
+    targetScore: clampNum(tsEl ? tsEl.value : 95, 70, 100, 95),
+    maxRounds:   clampNum(mrEl ? mrEl.value : 3, 2, 4, 3)
+  };
+}
+/* 최대 호출 수: 초안 1 + (라운드별 평가자 수 + 종합위원 1) */
+function preciseCallCount(maxRounds){
+  const mr = clampNum(maxRounds===undefined ? getPreciseCfg().maxRounds : maxRounds, 2, 4, 3);
+  let n = 1;
+  for(let r=1; r<=mr; r++) n += roundEvaluators(r).length + 1;
+  return n;
+}
+/* 조기 종료 시 최소 호출 수: 초안 1 + 1R 평가 + 1R 종합 + 2R 평가 */
+function preciseMinCallCount(){
+  return 1 + roundEvaluators(1).length + 1 + roundEvaluators(2).length;
+}
+
+// 평가 라운드 실행. evaluators: 이번 라운드 평가자 배열. second=true면 직전 라운드 지적을 이름(name)으로 매칭해 전달.
+async function runEvalRound({idPrefix, evaluators, draft, rawText, fileBlocks, second, prevEvals, onStep, round}){
   const step = onStep || (()=>{});
+  const r = round || (second ? 2 : 1);
   const extra = second
-    ? "\n\n[중요] 이 초안은 1차 평가를 거쳐 개선된 2차 버전입니다. 아래 [1차 평가에서 지적된 사항]이 실제로 반영되었는지 항목별로 확인하세요. 반영된 항목은 점수에 그대로 반영하여 상향하고, 여전히 미흡한 항목과 새로 발견한 미비점만 improvements에 남기세요. 평가 기준 자체는 1차와 동일하게 유지합니다."
+    ? `\n\n[중요] 이 초안은 ${r-1}차 평가를 거쳐 개선된 ${r}차 버전입니다. 아래 [직전 평가에서 지적된 사항]이 실제로 반영되었는지 항목별로 확인하세요. 반영된 항목은 점수에 그대로 반영하여 상향하고, 여전히 미흡한 항목과 새로 발견한 미비점만 improvements에 남기세요. 평가 기준 자체는 직전 라운드와 동일하게 유지합니다.`
     : "";
   const baseMsg = `[평가 대상 세특 초안]\n${draft}\n\n[학생 원자료 요약]\n${rawText}${extra}`;
   evaluators.forEach((ev,i)=> step(idPrefix+i,"run"));
@@ -1047,7 +1189,7 @@ async function runEvalRound({idPrefix, evaluators, draft, rawText, fileBlocks, s
     if(second){
       const prev = (prevEvals||[]).find(p => p.name===ev.name);  // 인덱스가 아닌 이름으로 매칭
       const prevImp = prev ? (prev.improvements||[]) : [];
-      msg += `\n\n[1차 평가에서 지적된 사항]\n${prevImp.length ? prevImp.map(s=>"- "+s).join("\n") : "- (이 관점은 1차 평가에 없었음 — 이번 라운드에서 처음 평가)"}`;
+      msg += `\n\n[직전 평가에서 지적된 사항]\n${prevImp.length ? prevImp.map(s=>"- "+s).join("\n") : "- (이 관점은 직전 라운드 평가에 없었음 — 이번 라운드에서 처음 평가)"}`;
     }
     const evalContent = [...fileBlocks, {kind:"text", text:msg}];
     try{
@@ -1060,7 +1202,7 @@ async function runEvalRound({idPrefix, evaluators, draft, rawText, fileBlocks, s
       return {name:ev.name, ...parsed, ok:true};
     }catch(e){
       step(idPrefix+i,"fail", "실패");
-      return {name:ev.name, score:null, strengths:[], improvements:[], to_perfect:[], ok:false, error:e.message};
+      return {name:ev.name, score:null, strengths:[], improvements:[], to_perfect:[], not_in_source:[], ok:false, error:e.message};
     }
   }));
 }
@@ -1077,8 +1219,27 @@ function lenRange(target){
   const t = Math.max(100, +src||500);
   return {t, lo:Math.round(t*0.9), hi:Math.round(t*1.1)};
 }
-function buildChairMsg({rawText, draft, oks, final, prevOks, targetLen}){
+/* not_in_source 취합 (중복 제거) — 반영 대상이 아니라 '넣지 말 것' 참고용 */
+function collectNotInSource(oks){
+  const out = [];
+  (oks||[]).forEach(r => (r.not_in_source||[]).forEach(s => {
+    const v = String(s||"").trim();
+    if(v && out.indexOf(v) < 0) out.push(v);
+  }));
+  return out.slice(0, 8);
+}
+function nisBlock(oks){
+  const ns = collectNotInSource(oks);
+  if(!ns.length) return "";
+  return `\n\n[반영 불가 항목 (원자료에 근거 없음) — 무리해서 넣지 말 것]\n${ns.map(s=>"- "+s).join("\n")}\n※ 위 항목들은 평가위원이 '원자료에 근거가 없어 반영할 수 없다'고 분류한 것입니다. 창작해서 채워 넣지 말고 무시하세요.`;
+}
+function scoreBlock(avg, targetScore){
+  if(avg==null || targetScore==null) return "";
+  return `\n\n[현재 점수 상황]\n현재 평균 ${avg}점입니다. 목표는 ${targetScore}점입니다. 아래 improvements와 to_perfect를 모두 해소하여 목표 점수에 도달할 수 있는 완성본을 작성하세요.`;
+}
+function buildChairMsg({rawText, draft, oks, final, prevOks, targetLen, avg, targetScore}){
   const {t, lo, hi} = lenRange(targetLen);
+  const nis = nisBlock(oks), sb = scoreBlock(avg, targetScore);
   if(!final){
     return `[학생 원자료 요약]
 ${rawText}
@@ -1087,111 +1248,147 @@ ${rawText}
 ${draft}
 
 [전문 평가위원 평가 결과 (${oks.length}인)]
-${fmtEvals(oks)}
+${fmtEvals(oks)}${nis}${sb}
 
 위 초안과 평가 결과를 반영하여 개선된 세특 본문만 작성하세요. 소극적 부분 수정이 아니라 과감하게 다시 써도 됩니다. 각 평가위원의 improvements와 to_perfect 항목을 하나도 빠짐없이 반영하세요. 각 항목이 어떻게 반영됐는지 스스로 점검한 후, 반영이 불가능한 항목(원자료에 근거 없음)만 제외하세요. 단, 원자료에 없는 사실을 창작하는 것은 여전히 금지 — 기존 사실의 서술 밀도(동기→과정→결과→성장·확장)를 끌어올리는 방식으로 반영하세요. 분량은 목표 ${t}자의 90~110%(${lo}~${hi}자)를 지키고 초과하지 마세요.`;
   }
   const prevBlock = (prevOks && prevOks.length)
-    ? `\n\n[1차 평가에서 지적된 사항 (참고 — 이미 개선본에 반영되었어야 함)]\n${prevOks.map(r=>`● ${r.name}\n${(r.improvements||[]).length ? (r.improvements).map(s=>"- "+s).join("\n") : "- (없음)"}`).join("\n\n")}`
+    ? `\n\n[직전 평가에서 지적된 사항 (참고 — 이미 개선본에 반영되었어야 함)]\n${prevOks.map(r=>`● ${r.name}\n${(r.improvements||[]).length ? (r.improvements).map(s=>"- "+s).join("\n") : "- (없음)"}`).join("\n\n")}`
     : "";
   return `[학생 원자료 요약]
 ${rawText}
 
-[세특 초안 — 1라운드 개선본]
+[세특 초안 — 직전 라운드 개선본]
 ${draft}${prevBlock}
 
-[2차 평가위원 평가 결과 (${oks.length}인)]
-${fmtEvals(oks)}
+[최종 라운드 평가위원 평가 결과 (${oks.length}인)]
+${fmtEvals(oks)}${nis}${sb}
 
-2차 평가에서 여전히 남은 지적과 to_perfect 항목을 모두 해소한 완성본을 작성하세요. 원자료에 없는 사실은 창작하지 말고, 기존 사실의 서술 밀도(동기→과정→결과→성장·확장)를 끌어올려 반영하세요. 최종 세특은 목표 ${t}자의 90~110%(${lo}~${hi}자)를 반드시 지키고 초과 시 핵심을 남기고 압축하세요. 최종 세특 본문만 출력하세요.`;
+이번 평가에서 여전히 남은 지적과 to_perfect 항목을 모두 해소한 완성본을 작성하세요. 원자료에 없는 사실은 창작하지 말고, 기존 사실의 서술 밀도(동기→과정→결과→성장·확장)를 끌어올려 반영하세요. 최종 세특은 목표 ${t}자의 90~110%(${lo}~${hi}자)를 반드시 지키고 초과 시 핵심을 남기고 압축하세요. 최종 세특 본문만 출력하세요.`;
 }
 
-// 진행 단계 동적 구성: 초안 + 1R(3) + 개선본 + 2R(4) + 최종 = 10스텝
-function preciseSteps(){
-  const R1 = EVALUATORS.slice(0,3), R2 = EVALUATORS.slice();
-  const steps = [{id:"draft", label:"1단계 · 초안 작성 (베테랑 교사)"}];
-  R1.forEach((ev,i)=> steps.push({id:"r1e"+i, label:`2단계(1R·${R1.length}인) · ${ev.name} 평가`}));
-  steps.push({id:"draft2", label:"3단계(1R) · 종합평가위원 개선본 작성"});
-  R2.forEach((ev,i)=> steps.push({id:"r2e"+i, label:`4단계(2R·${R2.length}인) · ${ev.name} 재평가`}));
-  steps.push({id:"final", label:"5단계(2R) · 종합평가위원 최종 작성"});
+// 진행 단계 동적 구성: 초안 + 라운드마다 (평가자 N인 + 종합위원)
+function preciseSteps(maxRounds){
+  const mr = clampNum(maxRounds===undefined ? getPreciseCfg().maxRounds : maxRounds, 2, 4, 3);
+  const steps = [{id:"draft", label:"초안 작성 (베테랑 교사)"}];
+  for(let r=1; r<=mr; r++){
+    const evs = roundEvaluators(r);
+    evs.forEach((ev,i)=> steps.push({
+      id:`r${r}e${i}`,
+      label:`${r}라운드(${evs.length}인) · ${ev.name} ${r===1 ? "평가" : "재평가"}`
+    }));
+    steps.push({
+      id:`chair${r}`,
+      label: r===mr ? `${r}라운드 · 종합평가위원 최종 작성` : `${r}라운드 · 종합평가위원 개선본 작성`
+    });
+  }
   return steps;
 }
 
 /* ---- 정밀 생성 코어 (단일/일괄 공용). 진행표시·출력은 콜백으로 위임 ---- */
-async function runPreciseCore({rawText, fileBlocks, targetLen, onStep, onDelta}){
+/* rounds 배열 → 하위호환 필드(evals1/evals2/draft1/draft2) 동봉 */
+function preciseResultShape(rounds){
+  return {
+    rounds,
+    draft1: rounds[0] ? rounds[0].draft : null,
+    evals1: rounds[0] ? rounds[0].evals : null,
+    draft2: rounds[1] ? rounds[1].draft : null,
+    evals2: rounds[1] ? rounds[1].evals : null
+  };
+}
+
+async function runPreciseCore({rawText, fileBlocks, targetLen, targetScore, maxRounds, onStep, onDelta}){
   const step = onStep || (()=>{});
   const delta = onDelta || (()=>{});
 
-  const R1 = EVALUATORS.slice(0,3);   // 1라운드: 학업·진로·공동체 (3인)
-  const R2 = EVALUATORS.slice();      // 2라운드: 3인 + 기재요령·문체 (4인)
-
+  const cfgDefault = getPreciseCfg();
+  const cfg = {
+    targetScore: clampNum(targetScore===undefined ? cfgDefault.targetScore : targetScore, 70, 100, 95),
+    maxRounds:   clampNum(maxRounds===undefined   ? cfgDefault.maxRounds   : maxRounds,   2,  4,  3)
+  };
   const finalTokens = Math.max(1200, (+targetLen||500) * 3);
 
-  // === 1라운드 ===
-  // 1단계 초안
+  // 남은 단계를 '건너뜀'으로 표시
+  const skipFrom = (fromRound, skipChairOfRound) => {
+    if(skipChairOfRound) step(`chair${skipChairOfRound}`, "skip", "목표 달성 · 건너뜀");
+    for(let r=fromRound; r<=cfg.maxRounds; r++){
+      roundEvaluators(r).forEach((ev,i)=> step(`r${r}e${i}`, "skip", "건너뜀"));
+      step(`chair${r}`, "skip", "건너뜀");
+    }
+  };
+
+  // 초안 작성 (1회)
   step("draft","run");
-  let draft1;
+  let draft;
   try{
-    draft1 = await callAI({
+    draft = await callAI({
       system:SYSTEM_PROMPT,
       content:[...fileBlocks, {kind:"text", text:rawText}],
       maxTokens:2000, stream:false
     });
-    if(!draft1.trim()) throw new Error("초안이 비어 있습니다.");
-    step("draft","done", draft1.length+"자");
-  }catch(e){ step("draft","fail"); throw new Error(`1단계(초안 작성)에서 실패 — ${e.message}`); }
+    if(!draft.trim()) throw new Error("초안이 비어 있습니다.");
+    step("draft","done", draft.length+"자");
+  }catch(e){ step("draft","fail"); throw new Error(`초안 작성에서 실패 — ${e.message}`); }
 
-  // 2단계 1R 3인 평가
-  const evals1 = await runEvalRound({idPrefix:"r1e", evaluators:R1, draft:draft1, rawText, fileBlocks, second:false, onStep:step});
-  const ok1 = evals1.filter(r=>r.ok);
-  if(ok1.length===0){
-    const err = new Error(`2단계(1R ${R1.length}인 평가) 전원 실패 — 1단계 초안을 최종 결과로 표시합니다.`);
-    err.partial = {text:draft1, evals1, draft1, evals2:null, draft2:null};
-    throw err;
+  const rounds = [];
+  let lastEvals = null, earlyStop = false;
+
+  for(let r=1; r<=cfg.maxRounds; r++){
+    const evs = roundEvaluators(r);
+    const evals = await runEvalRound({
+      idPrefix:`r${r}e`, evaluators:evs, draft, rawText, fileBlocks,
+      second: r>1, prevEvals:lastEvals, onStep:step, round:r
+    });
+    const oks = evals.filter(x=>x.ok);
+    if(oks.length===0){
+      const err = new Error(`${r}라운드 ${evs.length}인 평가 전원 실패 — 직전 단계 결과를 최종으로 표시합니다.`);
+      const partialRounds = rounds.concat([{r, evals, avg:null, draft}]);
+      err.partial = Object.assign({text:draft}, preciseResultShape(partialRounds));
+      throw err;
+    }
+    const avg = avgScore(oks);
+    rounds.push({r, evals, avg, draft});
+    lastEvals = evals;
+    const isLast = (r === cfg.maxRounds);
+
+    // 목표 달성 → 현재 draft가 최종 (2라운드 이상 진행한 뒤에만 조기 종료)
+    if(avg!=null && avg >= cfg.targetScore && r >= 2){
+      earlyStop = true;
+      skipFrom(r+1, r);
+      delta(draft);
+      break;
+    }
+
+    // 종합평가위원 개선 (마지막 라운드만 스트리밍)
+    step(`chair${r}`,"run");
+    if(isLast) delta("");
+    try{
+      const prevOks = (r>=2 && rounds[r-2]) ? rounds[r-2].evals.filter(x=>x.ok) : null;
+      const chairMsg = buildChairMsg({
+        rawText, draft, oks, final:isLast, prevOks, targetLen,
+        avg, targetScore:cfg.targetScore
+      });
+      const next = await callAI({
+        system:CHAIR_PROMPT,
+        content:[...fileBlocks, {kind:"text", text:chairMsg}],
+        maxTokens:finalTokens, stream:isLast,
+        onDelta: isLast ? (t => { delta(t); }) : undefined
+      });
+      if(!next.trim()) throw new Error(isLast ? "최종본이 비어 있습니다." : "개선본이 비어 있습니다.");
+      draft = next;
+      step(`chair${r}`,"done", draft.length+"자");
+      if(!isLast) delta(`✓ ${r}라운드 개선본 완성 — ${r+1}라운드 재평가 진행 중…\n\n` + draft);
+    }catch(e){
+      step(`chair${r}`,"fail");
+      throw new Error(`${r}라운드 ${isLast ? "최종" : "개선본"} 작성에서 실패 — ${e.message}`);
+    }
+    if(isLast) break;
   }
 
-  // 3단계 1R 종합평가위원 개선본 (non-streaming)
-  step("draft2","run");
-  let draft2;
-  try{
-    const chairMsg1 = buildChairMsg({rawText, draft:draft1, oks:ok1, final:false, targetLen});
-    draft2 = await callAI({
-      system:CHAIR_PROMPT,
-      content:[...fileBlocks, {kind:"text", text:chairMsg1}],
-      maxTokens:finalTokens, stream:false
-    });
-    if(!draft2.trim()) throw new Error("개선본이 비어 있습니다.");
-    step("draft2","done", draft2.length+"자");
-    delta("✓ 1라운드 개선본 완성 — 2라운드 재평가 진행 중…\n\n" + draft2);
-  }catch(e){ step("draft2","fail"); throw new Error(`3단계(1R 개선본 작성)에서 실패 — ${e.message}`); }
-
-  // === 2라운드 ===
-  // 4단계 2R 4인 재평가 (기재요령 포함, 1차 지적은 이름으로 매칭)
-  const evals2 = await runEvalRound({idPrefix:"r2e", evaluators:R2, draft:draft2, rawText, fileBlocks, second:true, prevEvals:evals1, onStep:step});
-  const ok2 = evals2.filter(r=>r.ok);
-  if(ok2.length===0){
-    const err = new Error(`4단계(2R ${R2.length}인 재평가) 전원 실패 — 1라운드 개선본을 최종 결과로 표시합니다.`);
-    err.partial = {text:draft2, evals1, draft1, evals2, draft2};
-    throw err;
-  }
-
-  // 5단계 2R 종합평가위원 최종본 (스트리밍)
-  step("final","run");
-  delta("");
-  let finalText;
-  try{
-    const chairMsg2 = buildChairMsg({rawText, draft:draft2, oks:ok2, final:true, prevOks:ok1, targetLen});
-    finalText = await callAI({
-      system:CHAIR_PROMPT,
-      content:[...fileBlocks, {kind:"text", text:chairMsg2}],
-      maxTokens:finalTokens, stream:true,
-      onDelta:t => { delta(t); }
-    });
-    if(!finalText.trim()) throw new Error("최종본이 비어 있습니다.");
-    step("final","done", finalText.length+"자");
-  }catch(e){ step("final","fail"); throw new Error(`5단계(2R 최종 작성)에서 실패 — ${e.message}`); }
-
-  return {final:finalText, draft1, draft2, evals1, evals2};
+  return Object.assign(
+    {final:draft, earlyStop, targetScore:cfg.targetScore, maxRounds:cfg.maxRounds},
+    preciseResultShape(rounds)
+  );
 }
 
 /* ---- 정밀 생성 (단일 모드 래퍼) ---- */
@@ -1199,20 +1396,22 @@ async function generatePrecise(){
   const out = $("#output");
   const rawText = buildUserText();
   const fileBlocks = await buildFileBlocks();
-  setupProgress(preciseSteps());
+  const cfg = getPreciseCfg();
+  setupProgress(preciseSteps(cfg.maxRounds));
   const targetLen = $("#targetLen").value;
   try{
     const r = await runPreciseCore({
       rawText, fileBlocks, targetLen,
+      targetScore:cfg.targetScore, maxRounds:cfg.maxRounds,
       onStep:(id,state,sub) => setStep(id,state,sub),
       onDelta:t => { out.textContent = t; }
     });
     finishCount(r.final);
-    renderReview({evals1:r.evals1, draft1:r.draft1, evals2:r.evals2, draft2:r.draft2});
+    renderReview(r);
   }catch(e){
     if(e.partial){
       out.textContent = e.partial.text; finishCount(e.partial.text);
-      renderReview({evals1:e.partial.evals1, draft1:e.partial.draft1, evals2:e.partial.evals2, draft2:e.partial.draft2});
+      renderReview(e.partial);
     }
     throw e;
   }
@@ -1228,42 +1427,53 @@ function evalCardHtml(r){
   const st = r.strengths.length ? `<div class="lbl">강점</div><ul>${r.strengths.map(s=>`<li>${esc(s)}</li>`).join("")}</ul>` : "";
   const im = r.improvements.length ? `<div class="lbl">개선 지시</div><ul>${r.improvements.map(s=>`<li>${esc(s)}</li>`).join("")}</ul>` : "";
   const tp = (r.to_perfect && r.to_perfect.length) ? `<div class="lbl">100점을 위해</div><ul>${r.to_perfect.map(s=>`<li>${esc(s)}</li>`).join("")}</ul>` : "";
-  return `<div class="evalcard"><h4>${esc(r.name)} <span class="sc">${r.score!=null?r.score+"점":"점수 없음"}</span></h4>${st}${im}${tp}</div>`;
+  const ns = (r.not_in_source && r.not_in_source.length)
+    ? `<div class="nislbl">원자료에 없어 반영 불가 (감점 사유 아님)</div><ul class="nis">${r.not_in_source.map(s=>`<li>${esc(s)}</li>`).join("")}</ul>` : "";
+  return `<div class="evalcard"><h4>${esc(r.name)} <span class="sc">${r.score!=null?r.score+"점":"점수 없음"}</span></h4>${st}${im}${tp}${ns}</div>`;
 }
 function avgScore(arr){
   const s = (arr||[]).filter(r=>r.score!=null);
   return s.length ? Math.round(s.reduce((a,r)=>a+r.score,0)/s.length) : null;
 }
-function renderReview({evals1, draft1, evals2, draft2}, targetEl){
+/* 신규(rounds 배열) / 구버전(evals1·evals2) 양쪽을 rounds 배열로 정규화 */
+function normalizeRounds(d){
+  if(!d) return [];
+  if(Array.isArray(d.rounds) && d.rounds.length) return d.rounds;
+  const out = [];
+  if(d.evals1 && d.evals1.length) out.push({r:1, evals:d.evals1, avg:avgScore(d.evals1.filter(x=>x.ok)), draft:d.draft1});
+  if(d.evals2 && d.evals2.length) out.push({r:2, evals:d.evals2, avg:avgScore(d.evals2.filter(x=>x.ok)), draft:d.draft2});
+  return out;
+}
+function renderReview(data, targetEl){
   const box = targetEl || $("#reviewBox");
-  const a1 = avgScore(evals1), a2 = avgScore(evals2);
-  const secStyle = "font-size:13px;font-weight:700;color:var(--purple);margin:14px 0 4px;padding-top:8px;border-top:1px dashed var(--line)";
+  const rounds = normalizeRounds(data);
+  if(!rounds.length){ box.innerHTML = ""; return; }
 
-  const badge = (a2!=null)
-    ? `<div class="badge">1차 평균 ${a1!=null?a1:"–"}점 → 2차 평균 ${a2}점</div>`
-    : `<div class="badge">1차 평균 ${a1!=null?a1:"–"}점</div>`;
+  const badge = `<div class="badge">${rounds.map(rd =>
+    `${rd.r}차 ${rd.avg!=null ? rd.avg+"점" : "–"}`).join(" → ")}</div>`;
 
-  const round1cards = evals1.map(evalCardHtml).join("");
-  const round2cards = (evals2 && evals2.length)
-    ? evals2.map(evalCardHtml).join("")
-    : `<div class="hint">2라운드 재평가가 진행되지 않았습니다.</div>`;
+  const early = (data && data.earlyStop)
+    ? `<div class="earlynote">🎯 목표 점수${data.targetScore!=null ? " "+data.targetScore+"점" : ""} 달성으로 ${rounds.length}라운드에서 조기 종료되었습니다. (남은 라운드 생략)</div>`
+    : "";
+
+  const body = rounds.map(rd => {
+    const cards = (rd.evals||[]).map(evalCardHtml).join("")
+      || `<div class="hint">이 라운드의 평가 결과가 없습니다.</div>`;
+    const draftBox = rd.draft
+      ? `<details class="sub">
+           <summary>📄 ${rd.r===1 ? "초안" : (rd.r-1)+"라운드 개선본"} 전문 보기</summary>
+           <div class="draftbox">${esc(rd.draft)}</div>
+         </details>`
+      : "";
+    return `<div class="roundhead">${rd.r}라운드 · ${(rd.evals||[]).length}인 평가${rd.avg!=null ? ` · 평균 ${rd.avg}점` : ""}</div>${draftBox}${cards}`;
+  }).join("");
 
   box.innerHTML =
     `<details class="review" open>
-      <summary>🏛️ 평가 과정 보기 (2라운드 평가위원회)</summary>
+      <summary>🏛️ 평가 과정 보기 (${rounds.length}라운드 평가위원회)</summary>
       ${badge}
-      <div style="${secStyle}">1라운드</div>
-      <details class="sub">
-        <summary>📄 1단계 초안 전문 보기</summary>
-        <div class="draftbox">${esc(draft1)}</div>
-      </details>
-      ${round1cards}
-      <div style="${secStyle}">2라운드</div>
-      ${draft2 ? `<details class="sub">
-        <summary>📄 1라운드 개선본 전문 보기</summary>
-        <div class="draftbox">${esc(draft2)}</div>
-      </details>` : ""}
-      ${round2cards}
+      ${early}
+      ${body}
     </details>`;
 }
 
@@ -1307,7 +1517,7 @@ function explainError(raw){
       how:[ "내일(태평양 시간 자정 기준) 한도가 초기화되면 다시 사용할 수 있습니다.",
             "지금 계속하려면 다른 구글 계정으로 키를 더 발급받아 <b>키 입력칸에 한 줄에 하나씩</b> 추가하세요. 키 개수만큼 한도가 늘어납니다.",
             "모델을 <b>Gemini 3.1 Flash-Lite</b>로 두면 하루 한도가 가장 넉넉합니다.",
-            "정밀 생성은 1명당 10회를 쓰므로, 많은 학생은 <b>빠른 생성</b>을 쓰세요." ] };
+            `정밀 생성은 1명당 최대 ${preciseCallCount()}회를 쓰므로, 많은 학생은 <b>빠른 생성</b>을 쓰세요. 목표 점수를 낮추거나 최대 라운드를 줄이면 호출 수가 줄어듭니다.` ] };
 
   // 4) 분당 속도 초과
   if(/429|rate limit|too many requests|resource_exhausted|resource exhausted/.test(low))
@@ -1402,7 +1612,7 @@ function newStudent(){
   return {
     id: "s" + (++stuSeq) + "_" + Date.now().toString(36),
     name:"", kind:"교과", subject:"", area:"자율", areaDetail:"",
-    quality:"", refText:"", files:[], targetLen:500,
+    quality:"", refText:"", files:[], targetLen:500, level:"auto",
     result:null, evals:null, status:"대기", error:null, collapsed:false
   };
 }
@@ -1471,6 +1681,10 @@ function renderStudents(){
                   placeholder="세부 활동/동아리명 (예: 학급 자치회, 과학탐구동아리 'OO')">
          </div>
 
+         <label class="mt14">학생 수준</label>
+         <select class="f-level">${levelOptionsHtml(st.level)}</select>
+         <div class="hint">산출물을 근거로 해당 수준에 맞는 밀도로 작성합니다. 부정적 표현은 사용하지 않습니다.</div>
+
          <label class="mt14">학생의 정성적 특성</label>
          <textarea class="f-quality" placeholder="수업/활동에서 드러난 학습 태도·강점을 구체적으로">${esc(st.quality)}</textarea>
 
@@ -1533,6 +1747,12 @@ function wireStudentCard(d, st, i){
   bind(".f-quality", "quality");
   bind(".f-refText", "refText");
 
+  const lvEl = d.querySelector(".f-level");
+  if(lvEl) lvEl.onchange = () => {
+    st.level = LEVELS[lvEl.value] ? lvEl.value : "auto";
+    scheduleSave();
+  };
+
   // 학생별 독립 파일 (전역 files와 공유하지 않음)
   const fz = d.querySelector(".fz"), fin = d.querySelector(".fin"), flist = d.querySelector(".flist");
   fz.onclick = e => { if(e.target === fin) return; fin.click(); };
@@ -1564,7 +1784,9 @@ function renderStudentFiles(el, st){
 
 /* ---- 진행표 ---- */
 function studentScore(st){
-  return (st.evals && st.evals.evals2) ? avgScore(st.evals.evals2) : null;
+  const rs = normalizeRounds(st.evals);
+  if(rs.length) return rs[rs.length-1].avg;
+  return null;
 }
 function renderBatchTable(){
   const box = $("#batchTableBox"); if(!box) return;
@@ -1616,8 +1838,8 @@ function showBatchResult(i){
     $("#batchCopyBtn").textContent = "복사됨 ✓";
     setTimeout(() => $("#batchCopyBtn").textContent = "복사", 1500);
   });
-  if(st.evals && st.evals.evals1){
-    renderReview({evals1:st.evals.evals1, draft1:st.evals.draft1, evals2:st.evals.evals2, draft2:st.evals.draft2}, $("#batchReview"));
+  if(st.evals && normalizeRounds(st.evals).length){
+    renderReview(st.evals, $("#batchReview"));
   }
   panel.scrollIntoView({behavior:"smooth", block:"nearest"});
 }
@@ -1644,7 +1866,7 @@ function setBatchBusy(on){
 function autoIntervalSec(mode){
   try{
     if(curProvider === "anthropic") return 0;        // Anthropic은 자동 대기 없음
-    const callsPerStudent = (mode === "precise") ? 10 : 1;
+    const callsPerStudent = (mode === "precise") ? preciseCallCount() : 1;
     let rpm = 0, keys = 1;
     try{ rpm = +(getRateCfg().rpm) || 0; }catch(e){ rpm = 0; }
     try{ keys = Math.max(1, getKeyPool().length); }catch(e){ keys = 1; }
@@ -1726,17 +1948,19 @@ async function runBatch(bmode, onlyPending){
   const targets = students.map((s, i) => ({s, i})).filter(({s}) => onlyPending ? s.status!=="완료" : true);
   if(!targets.length){ showBatchErr(onlyPending ? "재시도할 학생이 없습니다. (모두 완료)" : "학생을 추가해 주세요."); return; }
 
-  const per = bmode==="precise" ? 10 : 1;
-  const label = bmode==="precise" ? "정밀 생성" : "빠른 생성";
+  const pcfg = getPreciseCfg();
+  const per = bmode==="precise" ? preciseCallCount(pcfg.maxRounds) : 1;
+  const perTxt = bmode==="precise" ? `최대 ${per}회` : `${per}회`;
+  const label = bmode==="precise" ? `정밀 생성(최대 ${pcfg.maxRounds}라운드, 목표 ${pcfg.targetScore}점)` : "빠른 생성";
   const intervalSec = effectivePaceSec(bmode);
   const intervalMs = intervalSec * 1000;
   let confMsg;
   if(intervalSec > 0 && targets.length > 1){
     const estMin = Math.ceil(intervalSec * (targets.length - 1) / 60);
-    confMsg = `학생 ${targets.length}명 × ${label}(${per}회), 예상 API 호출 ${targets.length*per}회`
+    confMsg = `학생 ${targets.length}명 × ${label}(${perTxt}), 예상 API 호출 최대 ${targets.length*per}회`
             + ` · 학생 간 간격 ${intervalSec}초 → 예상 약 ${estMin}분. 진행할까요?`;
   } else {
-    confMsg = `학생 ${targets.length}명 × ${label}, 예상 API 호출 ${targets.length}×${per} = ${targets.length*per}회. 진행할까요?`;
+    confMsg = `학생 ${targets.length}명 × ${label}, 예상 API 호출 ${targets.length}×${perTxt} = 최대 ${targets.length*per}회. 진행할까요?`;
   }
   if(!confirm(confMsg)) return;
 
@@ -1763,15 +1987,18 @@ async function runBatch(bmode, onlyPending){
         s.result = await runQuickCore({rawText, fileBlocks});
         s.evals = null;
       } else {
-        const r = await runPreciseCore({rawText, fileBlocks, targetLen:s.targetLen});
+        const r = await runPreciseCore({
+          rawText, fileBlocks, targetLen:s.targetLen,
+          targetScore:pcfg.targetScore, maxRounds:pcfg.maxRounds
+        });
         s.result = r.final;
-        s.evals = {evals1:r.evals1, evals2:r.evals2, draft1:r.draft1, draft2:r.draft2};
+        s.evals = {rounds:r.rounds, earlyStop:r.earlyStop, targetScore:r.targetScore, maxRounds:r.maxRounds};
       }
       s.status = "완료"; s.error = null;
     }catch(e){
       if(e.partial && e.partial.text){       // 부분 결과라도 보존
         s.result = e.partial.text;
-        s.evals = {evals1:e.partial.evals1, evals2:e.partial.evals2, draft1:e.partial.draft1, draft2:e.partial.draft2};
+        s.evals = {rounds:e.partial.rounds||[], earlyStop:false, targetScore:pcfg.targetScore, maxRounds:pcfg.maxRounds};
       }
       s.status = "실패"; s.error = e.message;
       if(isQuotaExhausted(e.message)){
@@ -1803,7 +2030,7 @@ async function runBatch(bmode, onlyPending){
 
 /* ---- 저장 / 복원 ---- */
 const SER_FIELDS = ["id","name","kind","subject","area","areaDetail","quality","refText",
-                    "targetLen","result","evals","status","error"];
+                    "targetLen","level","result","evals","status","error"];
 function serializeStudents(){
   return students.map(s => { const o = {}; SER_FIELDS.forEach(k => o[k] = s[k]); return o; });
 }
@@ -1814,7 +2041,11 @@ function saveBatchState(){
   catch(e){ /* 용량 초과 등은 무시 */ }
 }
 function studentsFromRaw(arr){
-  return arr.map(x => Object.assign(newStudent(), x, {files:[], collapsed:true}));
+  return arr.map(x => {
+    const s = Object.assign(newStudent(), x, {files:[], collapsed:true});
+    if(!LEVELS[s.level]) s.level = "auto";   // 하위호환: level 없던 저장본
+    return s;
+  });
 }
 function loadBatchState(){
   try{
@@ -1932,12 +2163,21 @@ $("#importJsonInput").onchange = e => {
   const f = e.target.files[0]; if(f) importBatchJson(f); e.target.value = "";
 };
 
+/* ---- 정밀 생성 설정 UI 이벤트 ---- */
+(function wirePreciseCfgUI(){
+  const ts = $("#targetScore"), mr = $("#maxRounds");
+  const on = () => updatePreciseLabels();
+  if(ts){ ts.addEventListener("input", on); ts.addEventListener("change", on); }
+  if(mr) mr.addEventListener("change", on);
+})();
+
 /* ---- 배치 초기화 ---- */
 if(loadBatchState()) $("#batchRestoreNote").classList.remove("hidden");
 if(!students.length) students.push(newStudent());
 renderStudents();
 renderBatchTable();
 updatePaceInfo();
+updatePreciseLabels();
 applyGenMode();
 </script>
 </body>
