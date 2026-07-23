@@ -68,7 +68,8 @@
   .ptag.paid{background:#f3f4f6;color:var(--sub);border-color:var(--line)}
   .seg button.on .ptag{background:rgba(255,255,255,.22);color:#fff;border-color:rgba(255,255,255,.35)}
   .mt14{margin-top:14px}
-  .hidden{display:none}
+  /* .genrow 등 뒤에 오는 display 규칙에 덮이지 않도록 !important 유지 */
+  .hidden{display:none !important}
   .files{border:1.5px dashed var(--line);border-radius:11px;padding:16px;text-align:center;
     cursor:pointer;transition:.12s;background:#fafbfc}
   .files:hover{border-color:var(--brand);background:var(--accent)}
@@ -1280,9 +1281,101 @@ $("#copyBtn").onclick = () => {
     $("#copyBtn").textContent="복사됨 ✓"; setTimeout(()=>$("#copyBtn").textContent="복사",1500);
   });
 };
+/* ---- 오류를 한글로 쉽게 설명하고 해결 방법을 안내 ---- */
+function explainError(raw){
+  const s = String(raw||"");
+  const low = s.toLowerCase();
+  const isG = curProvider === "gemini";
+  const keyPlace = isG ? "Google AI Studio" : "Anthropic Console";
+
+  // 1) 키가 잘못됨
+  if(/api key not valid|api_key_invalid|invalid[_ ]api[_ ]key|invalid x-api-key|authentication|unauthorized|401/.test(low))
+    return { why:"입력한 API 키가 올바르지 않습니다.",
+      how:[ "키를 복사할 때 앞뒤 공백이나 줄바꿈이 섞이지 않았는지 확인하세요.",
+            `현재 <b>${isG?"Google Gemini":"Anthropic Claude"}</b>가 선택되어 있습니다. 다른 회사 키를 넣지 않았는지 확인하세요. (Gemini 키는 <code>AIza…</code>, Claude 키는 <code>sk-ant-…</code>로 시작합니다)`,
+            `키가 삭제·만료되었을 수 있으니 ${keyPlace}에서 새 키를 발급받아 붙여넣으세요.` ] };
+
+  // 2) 크레딧/결제 문제 (주로 Claude)
+  if(/credit balance|insufficient|billing|payment|402|quota exceeded for quota metric.*billing/.test(low))
+    return { why:"API 사용 크레딧(잔액)이 부족합니다.",
+      how:[ "Anthropic Console → Billing에서 결제 수단을 등록하고 크레딧을 충전하세요.",
+            "무료로 쓰시려면 왼쪽의 <b>Google Gemini</b>로 바꿔서 사용하세요." ] };
+
+  // 3) 일일 한도 소진
+  if(/per day|daily limit|requests per day|generate_content_free_tier_requests/.test(low))
+    return { why:"오늘 사용할 수 있는 무료 요청 횟수를 모두 썼습니다.",
+      how:[ "내일(태평양 시간 자정 기준) 한도가 초기화되면 다시 사용할 수 있습니다.",
+            "지금 계속하려면 다른 구글 계정으로 키를 더 발급받아 <b>키 입력칸에 한 줄에 하나씩</b> 추가하세요. 키 개수만큼 한도가 늘어납니다.",
+            "모델을 <b>Gemini 3.1 Flash-Lite</b>로 두면 하루 한도가 가장 넉넉합니다.",
+            "정밀 생성은 1명당 10회를 쓰므로, 많은 학생은 <b>빠른 생성</b>을 쓰세요." ] };
+
+  // 4) 분당 속도 초과
+  if(/429|rate limit|too many requests|resource_exhausted|resource exhausted/.test(low))
+    return { why:"짧은 시간에 요청을 너무 많이 보내 잠시 차단되었습니다.",
+      how:[ "1~2분 기다렸다가 다시 시도하세요.",
+            "일괄 생성이라면 <b>학생 간 간격</b>을 '자동'으로 두거나 초를 더 늘리세요.",
+            "1번 카드의 <b>고급 설정</b>에서 분당 요청(RPM) 값을 실제 한도보다 낮게 조정하세요.",
+            "키를 여러 개 넣으면 분산되어 속도 제한에 덜 걸립니다." ] };
+
+  // 5) 모델명 오류
+  if(/not found|is not supported|unsupported model|invalid model|model.*does not exist|404/.test(low))
+    return { why:"선택한 모델 이름을 해당 회사에서 찾을 수 없습니다.",
+      how:[ "모델 목록에서 <b>맨 위 권장 모델</b>을 선택해 보세요.",
+            "'직접 입력'을 쓰셨다면 모델 ID의 오타를 확인하세요.",
+            "제공자와 모델이 서로 맞는지 확인하세요. (Gemini 선택 시 claude- 모델은 쓸 수 없습니다)" ] };
+
+  // 6) 첨부 용량 초과
+  if(/too large|payload|413|request entity|exceeds the maximum|size limit/.test(low))
+    return { why:"첨부한 자료의 용량이 너무 큽니다.",
+      how:[ "첨부 파일 수를 줄이거나, 스캔 이미지 대신 텍스트로 붙여넣어 보세요.",
+            "PDF가 크면 필요한 쪽만 남겨 다시 저장한 뒤 첨부하세요." ] };
+
+  // 7) 서버 혼잡
+  if(/overloaded|503|502|500|internal|unavailable|try again later/.test(low))
+    return { why:"AI 회사 서버가 일시적으로 혼잡하거나 점검 중입니다.",
+      how:[ "잠시 후 다시 시도하세요. 대개 몇 분 안에 정상화됩니다.",
+            "급하시면 다른 모델이나 다른 제공자로 바꿔서 시도해 보세요." ] };
+
+  // 8) 네트워크 문제
+  if(/failed to fetch|networkerror|load failed|err_|cors|net::/.test(low))
+    return { why:"인터넷 연결이 끊겼거나 학교 방화벽이 요청을 막았습니다.",
+      how:[ "인터넷 연결을 확인하세요.",
+            "학교 망에서 차단될 수 있으니 다른 네트워크(개인 휴대폰 테더링 등)로 시도해 보세요.",
+            "광고 차단·보안 확장 프로그램을 잠시 꺼보세요." ] };
+
+  // 9) 안전 필터
+  if(/safety|blocked|prohibited|content filter|recitation/.test(low))
+    return { why:"AI의 안전 필터가 요청 내용을 차단했습니다.",
+      how:[ "학생 산출물에 민감한 표현이 있는지 확인하고 해당 부분을 빼고 다시 시도하세요.",
+            "정성적 특성 입력란의 문구를 조금 바꿔서 다시 시도해 보세요." ] };
+
+  // 10) 응답이 비었음
+  if(/비어 있습니다|empty/.test(s))
+    return { why:"AI가 내용을 만들지 못하고 빈 응답을 보냈습니다.",
+      how:[ "다시 시도하면 대개 해결됩니다.",
+            "참고 자료나 정성적 특성을 조금 더 구체적으로 채워 주세요.",
+            "목표 글자 수가 너무 크면 줄여 보세요." ] };
+
+  return { why:"알 수 없는 오류가 발생했습니다.",
+    how:[ "잠시 후 다시 시도해 보세요.",
+          "API 키와 선택한 모델이 올바른지 확인하세요.",
+          "계속 같은 오류가 나면 아래 원문 메시지를 함께 문의해 주세요." ] };
+}
+
+function errHtml(m){
+  const ex = explainError(m);
+  return `<div class="err">
+    <div style="font-weight:700;margin-bottom:6px">⚠ ${esc(ex.why)}</div>
+    <div style="font-weight:700;font-size:12px;margin:8px 0 3px">이렇게 해보세요</div>
+    <ul style="margin:0;padding-left:18px">${ex.how.map(h=>`<li style="margin:2px 0">${h}</li>`).join("")}</ul>
+    <details style="margin-top:8px"><summary style="cursor:pointer;font-size:12px">오류 원문 보기</summary>
+      <div style="font-size:12px;margin-top:5px;word-break:break-all">${esc(m)}</div></details>
+  </div>`;
+}
+
 function showErr(m){
   const box = $("#errBox");
-  box.innerHTML = `<div class="err">⚠ ${esc(m)}</div>`;
+  box.innerHTML = errHtml(m);
   /* 생성 중에는 결과 영역을 보고 있어 화면 위쪽의 오류를 놓치기 쉬우므로,
      결과 영역에도 안내를 남기고 오류 위치로 스크롤한다. */
   const out = $("#output");
@@ -1326,8 +1419,8 @@ function statusIcon(s){
 }
 
 /* ---- 모드 전환 ---- */
-const SINGLE_ELS = ["#card2","#card3","#card4","#singleGenRow","#singleHint","#resultCard"];
-const BATCH_ELS  = ["#batchCard","#batchRunRow","#batchStatusCard","#batchResultCard"];
+const SINGLE_ELS = ["#card2","#card3","#card4","#singleGenRow","#singleHint","#errBox","#resultCard"];
+const BATCH_ELS  = ["#batchCard","#batchRunRow","#batchErr","#batchStatusCard","#batchResultCard"];
 function applyGenMode(){
   const isB = genMode==="batch";
   SINGLE_ELS.forEach(sel => { const el = $(sel); if(el) el.classList.toggle("hidden", isB); });
@@ -1532,7 +1625,7 @@ function showBatchResult(i){
 /* ---- 배치 실행 ---- */
 function showBatchErr(m){
   const el = $("#batchErr"); if(!el) return;
-  el.innerHTML = m ? `<div class="err">${esc(m)}</div>` : "";
+  el.innerHTML = m ? errHtml(m) : "";
 }
 function setBatchBusy(on){
   const qb = $("#batchQuickBtn"), pb = $("#batchPreciseBtn"), rb = $("#batchRetryBtn");
