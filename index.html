@@ -392,9 +392,9 @@ const PROVIDERS = {
     label:"Google Gemini API 키", storeKey:"geminiKey", placeholder:"AIza...",
     link:"https://aistudio.google.com/app/apikey", linkText:"aistudio.google.com",
     models:[
-      ["gemini-3.1-pro","Gemini 3.1 Pro (권장·고성능)"],
+      ["gemini-3.1-flash-lite","Gemini 3.1 Flash-Lite (권장·무료 한도 가장 여유)"],
       ["gemini-3.5-flash","Gemini 3.5 Flash (균형)"],
-      ["gemini-3.1-flash-lite","Gemini 3.1 Flash-Lite (무료 한도 여유)"],
+      ["gemini-3.1-pro","Gemini 3.1 Pro (고성능·무료 한도 낮음)"],
       ["gemini-2.5-pro","Gemini 2.5 Pro (구버전)"]
     ]
   }
@@ -1280,7 +1280,18 @@ $("#copyBtn").onclick = () => {
     $("#copyBtn").textContent="복사됨 ✓"; setTimeout(()=>$("#copyBtn").textContent="복사",1500);
   });
 };
-function showErr(m){ $("#errBox").innerHTML=`<div class="err">${m}</div>`; }
+function showErr(m){
+  const box = $("#errBox");
+  box.innerHTML = `<div class="err">⚠ ${esc(m)}</div>`;
+  /* 생성 중에는 결과 영역을 보고 있어 화면 위쪽의 오류를 놓치기 쉬우므로,
+     결과 영역에도 안내를 남기고 오류 위치로 스크롤한다. */
+  const out = $("#output");
+  if(out && !out.textContent.trim()){
+    out.classList.add("empty");
+    out.textContent = "⚠ 생성에 실패했습니다. 위에 표시된 오류 메시지를 확인해 주세요.";
+  }
+  try{ box.scrollIntoView({behavior:"smooth", block:"center"}); }catch{}
+}
 
 /* ================================================================
    일괄(배치) 생성 모드
