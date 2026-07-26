@@ -404,6 +404,7 @@
     </div>
     <div class="out empty" id="output">여기에 세특이 생성됩니다.</div>
     <div class="cnt mt14" id="counter" style="display:none"></div>
+    <div id="precompressBox"></div>
     <div id="reviewBox"></div>
   </div>
 
@@ -1170,6 +1171,7 @@ function beginOutput(){
   const out = $("#output"); out.classList.remove("empty"); out.textContent="";
   $("#copyBtn").style.display="none"; $("#counter").style.display="none";
   $("#reviewBox").innerHTML=""; $("#errBox").innerHTML="";
+  const pb = $("#precompressBox"); if(pb) pb.innerHTML="";
 }
 function setBusy(on, mode){
   quickBtn.disabled = on; preciseBtn.disabled = on;
@@ -1252,8 +1254,9 @@ function trimToLimit(text, limit){
 }
 
 async function enforceLength(text, {targetLen, onDelta} = {}){
+  const original = text;
   const limit = Math.max(1, (+targetLen) || measure(text));
-  if(measure(text) <= limit) return text;
+  if(measure(text) <= limit) return {text, precompress:null};
   for(let attempt=0; attempt<2; attempt++){
     try{
       const charApprox = getUnit()==="byte" ? limit/getHangulBytes() : limit;
@@ -1276,7 +1279,7 @@ async function enforceLength(text, {targetLen, onDelta} = {}){
     text = trimToLimit(text, limit);
     onDelta && onDelta(text);
   }
-  return text;
+  return {text, precompress:original};
 }
 
 /* ---- 빠른 생성 코어 (단일/일괄 공용) ---- */
@@ -1287,9 +1290,8 @@ async function runQuickCore({rawText, fileBlocks, targetLen, onDelta}){
     onDelta:t => { onDelta && onDelta(t); }
   });
   if(!text.trim()){ const e = new Error("응답이 비어 있습니다. 다시 시도해 주세요."); e.emptyResult = true; throw e; }
-  let out = text;
-  out = await enforceLength(out, {targetLen, onDelta});
-  return out;
+  const enf = await enforceLength(text, {targetLen, onDelta});
+  return {final: enf.text, precompress: enf.precompress};
 }
 
 /* ---- 빠른 생성 (단일 모드 래퍼) ---- */
@@ -1297,12 +1299,14 @@ async function generateQuick(){
   const out = $("#output");
   const fileBlocks = await buildFileBlocks();
   try{
-    const text = await runQuickCore({
+    const targetLen = $("#targetLen").value;
+    const r = await runQuickCore({
       rawText: buildUserText(), fileBlocks,
-      targetLen: $("#targetLen").value,
+      targetLen,
       onDelta: t => { out.textContent = t; }
     });
-    finishCount(text);
+    finishCount(r.final);
+    showPrecompress(r.precompress, targetLen);
   }catch(e){
     if(e.emptyResult){ showErr("응답이 비어 있습니다. 다시 시도해 주세요."); return; }
     throw e;
@@ -1551,10 +1555,11 @@ async function runPreciseCore({rawText, fileBlocks, targetLen, targetScore, maxR
     if(isLast) break;
   }
 
-  draft = await enforceLength(draft, {targetLen, onDelta: t => delta(t)});
+  const enf = await enforceLength(draft, {targetLen, onDelta: t => delta(t)});
+  draft = enf.text;
 
   return Object.assign(
-    {final:draft, earlyStop, targetScore:cfg.targetScore, maxRounds:cfg.maxRounds},
+    {final:draft, precompress:enf.precompress, earlyStop, targetScore:cfg.targetScore, maxRounds:cfg.maxRounds},
     preciseResultShape(rounds)
   );
 }
@@ -1576,10 +1581,12 @@ async function generatePrecise(){
     });
     finishCount(r.final);
     renderReview(r);
+    showPrecompress(r.precompress, targetLen);
   }catch(e){
     if(e.partial){
       out.textContent = e.partial.text; finishCount(e.partial.text);
       renderReview(e.partial);
+      showPrecompress(null, targetLen);
     }
     throw e;
   }
@@ -1666,6 +1673,28 @@ function finishCount(text){
   c.className = "cnt mt14"+(over?" over":"");
   c.innerHTML = html;
   $("#copyBtn").style.display="inline-block";
+}
+/* ---- 압축 전 원본(precompress) 표시 — 단일/배치 공용. text가 없으면 컨테이너를 비운다 ---- */
+function showPrecompress(text, targetLen, container){
+  const box = container || $("#precompressBox");
+  if(!box) return;
+  if(!text || !String(text).trim()){ box.innerHTML = ""; return; }
+  const {html} = countLine(text, targetLen);
+  const btnId = "pcCopy_" + Math.random().toString(36).slice(2, 9);
+  box.innerHTML =
+    `<details class="review">
+       <summary>📄 압축 전 원본 보기 (더 상세, 목표 분량 초과본)</summary>
+       <div class="draftbox">${esc(text)}</div>
+       <div class="cnt mt14">${html}</div>
+       <div class="hint" style="font-size:12px;color:var(--sub);margin-top:6px">이 버전은 목표를 초과하여 자동 압축되기 전 상태입니다.</div>
+       <button class="copybtn" id="${btnId}" style="margin-top:8px">원본 복사</button>
+     </details>`;
+  const btn = document.getElementById(btnId);
+  if(btn) btn.onclick = () => {
+    navigator.clipboard.writeText(text).then(()=>{
+      btn.textContent="복사됨 ✓"; setTimeout(()=>{ btn.textContent="원본 복사"; }, 1500);
+    });
+  };
 }
 $("#copyBtn").onclick = () => {
   navigator.clipboard.writeText($("#output").textContent).then(()=>{
@@ -1799,7 +1828,7 @@ function newStudent(){
     id: "s" + (++stuSeq) + "_" + Date.now().toString(36),
     name:"", kind:"교과", subject:"", area:"자율", areaDetail:"",
     quality:"", refText:"", files:[], targetLen:defaultTargetLen("교과","자율"), level:"auto",
-    result:null, evals:null, status:"대기", error:null, collapsed:false
+    result:null, precompress:null, evals:null, status:"대기", error:null, collapsed:false
   };
 }
 function syncStudentLen(st){
@@ -2014,6 +2043,7 @@ function showBatchResult(i){
      </div>
      <div class="out" id="batchOut"></div>
      <div class="cnt mt14" id="batchCnt"></div>
+     <div id="batchPrecompressBox"></div>
      <div id="batchReview"></div>`;
   $("#batchOut").textContent = st.result;
   const target = +st.targetLen || 500;
@@ -2025,6 +2055,7 @@ function showBatchResult(i){
     $("#batchCopyBtn").textContent = "복사됨 ✓";
     setTimeout(() => $("#batchCopyBtn").textContent = "복사", 1500);
   });
+  showPrecompress(st.precompress, target, $("#batchPrecompressBox"));
   if(st.evals && normalizeRounds(st.evals).length){
     renderReview(st.evals, $("#batchReview"));
   }
@@ -2171,20 +2202,22 @@ async function runBatch(bmode, onlyPending){
       const rawText = buildUserTextFrom(s);
       const fileBlocks = await buildFileBlocksFrom(s.files);
       if(bmode==="quick"){
-        s.result = await runQuickCore({rawText, fileBlocks, targetLen: s.targetLen});
+        const q = await runQuickCore({rawText, fileBlocks, targetLen: s.targetLen});
+        s.result = q.final; s.precompress = q.precompress;
         s.evals = null;
       } else {
         const r = await runPreciseCore({
           rawText, fileBlocks, targetLen:s.targetLen,
           targetScore:pcfg.targetScore, maxRounds:pcfg.maxRounds
         });
-        s.result = r.final;
+        s.result = r.final; s.precompress = r.precompress;
         s.evals = {rounds:r.rounds, earlyStop:r.earlyStop, targetScore:r.targetScore, maxRounds:r.maxRounds};
       }
       s.status = "완료"; s.error = null;
     }catch(e){
       if(e.partial && e.partial.text){       // 부분 결과라도 보존
         s.result = e.partial.text;
+        s.precompress = null;
         s.evals = {rounds:e.partial.rounds||[], earlyStop:false, targetScore:pcfg.targetScore, maxRounds:pcfg.maxRounds};
       }
       s.status = "실패"; s.error = e.message;
@@ -2217,7 +2250,7 @@ async function runBatch(bmode, onlyPending){
 
 /* ---- 저장 / 복원 ---- */
 const SER_FIELDS = ["id","name","kind","subject","area","areaDetail","quality","refText",
-                    "targetLen","level","result","evals","status","error"];
+                    "targetLen","level","result","precompress","evals","status","error"];
 function serializeStudents(){
   return students.map(s => { const o = {}; SER_FIELDS.forEach(k => o[k] = s[k]); return o; });
 }
@@ -2308,7 +2341,8 @@ function collectBatchRows(){
       charLen: s.result.length,
       byteLen: byteLen(s.result, getHangulBytes()),
       score: studentScore(s),
-      result: s.result
+      result: s.result,
+      precompress: s.precompress || ""
     });
   });
   return rows;
@@ -2316,9 +2350,9 @@ function collectBatchRows(){
 function downloadCsv(){
   const data = collectBatchRows();
   if(!data.length){ showBatchErr("내려받을 결과가 없습니다."); return; }
-  const rows = [["식별자","구분","과목/영역","수준","글자수","Byte","점수","세특"]];
+  const rows = [["식별자","구분","과목/영역","수준","글자수","Byte","점수","세특","압축 전 원본"]];
   data.forEach(r => rows.push([
-    r.label, r.kind, r.subjectArea, r.level, r.charLen, r.byteLen, r.score!=null ? r.score : "", r.result
+    r.label, r.kind, r.subjectArea, r.level, r.charLen, r.byteLen, r.score!=null ? r.score : "", r.result, r.precompress
   ]));
   const csv = "﻿" + rows.map(r => r.map(csvEscape).join(",")).join("\r\n");   // BOM: 엑셀 호환
   dlBlob(csv, `세특_일괄_${stampNow()}.csv`, "text/csv;charset=utf-8");
@@ -2408,7 +2442,7 @@ function xlsxColLetter(idx){
   while(n > 0){ const rem = (n - 1) % 26; s = String.fromCharCode(65 + rem) + s; n = Math.floor((n - 1) / 26); }
   return s;
 }
-const XLSX_HEADERS = ["식별자","구분","과목/영역","수준","글자수","Byte","점수","세특"];
+const XLSX_HEADERS = ["식별자","구분","과목/영역","수준","글자수","Byte","점수","세특","압축 전 원본"];
 function xlsxSheetXml(rows){
   let body = "<row r=\"1\">" + XLSX_HEADERS.map((h, ci) =>
     `<c r="${xlsxColLetter(ci)}1" t="inlineStr" s="1"><is><t xml:space="preserve">${xmlEscape(h)}</t></is></c>`
@@ -2421,7 +2455,8 @@ function xlsxSheetXml(rows){
       strCell("A", r.label), strCell("B", r.kind), strCell("C", r.subjectArea), strCell("D", r.level),
       numCell("E", r.charLen), numCell("F", r.byteLen),
       r.score != null ? numCell("G", r.score) : strCell("G", ""),
-      strCell("H", r.result, " s=\"2\"")
+      strCell("H", r.result, " s=\"2\""),
+      strCell("I", r.precompress, " s=\"2\"")
     ];
     body += `<row r="${rn}">${cells.join("")}</row>`;
   });
@@ -2436,6 +2471,7 @@ function xlsxSheetXml(rows){
     `<col min="6" max="6" width="10" customWidth="1"/>` +
     `<col min="7" max="7" width="8" customWidth="1"/>` +
     `<col min="8" max="8" width="80" customWidth="1"/>` +
+    `<col min="9" max="9" width="80" customWidth="1"/>` +
     `</cols>` +
     `<sheetData>${body}</sheetData></worksheet>`;
 }
