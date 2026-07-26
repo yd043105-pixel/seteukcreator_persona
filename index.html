@@ -196,7 +196,8 @@
         <input type="text" id="customModel" class="mt14 hidden" placeholder="모델 ID 직접 입력 (예: gemini-3.1-pro)">
       </div>
       <div>
-        <label>목표 분량</label>
+        <label>목표 분량
+          <span class="hint" style="display:inline">단일·일괄 공용 (일괄에서는 학생별로 개별 지정 가능)</span></label>
         <div style="display:flex;gap:8px">
           <input type="number" id="targetLen" value="500" min="100" max="2000" step="50" style="flex:1">
           <select id="targetUnit" style="width:112px;flex:none">
@@ -722,24 +723,33 @@ let lastUnit = "char", lastHangulBytes = 3;
   if(!unitEl || !tl) return;
   unitEl.onchange = () => {
     const newUnit = unitEl.value, hb = getHangulBytes();
-    let v = +tl.value || 0;
-    if(lastUnit==="char" && newUnit==="byte") v = Math.round(v * hb);
-    else if(lastUnit==="byte" && newUnit==="char") v = Math.round(v / hb);
+    let v = +tl.value || 0, factor = 1;
+    if(lastUnit==="char" && newUnit==="byte") factor = hb;
+    else if(lastUnit==="byte" && newUnit==="char") factor = 1/hb;
+    v = Math.round(v * factor);
     lastUnit = newUnit;
     applyUnitUI();
     tl.value = clampToUnitRange(v);
+    /* 학생별 개별 지정값도 카드1과 동일한 규칙으로 환산 (null은 대상 아님) */
+    try{ if(factor !== 1) convertStudentTargetLens(factor); }catch(e){}
+    try{ renderStudents(); }catch(e){}
     try{ updatePreciseLabels(); }catch(e){}
   };
   if(hgEl) hgEl.onchange = () => {
     const newHb = getHangulBytes();
+    let factor = 1;
     if(getUnit()==="byte" && newHb!==lastHangulBytes){
-      const v = Math.round((+tl.value || 0) / lastHangulBytes * newHb);
-      tl.value = clampToUnitRange(v);
+      factor = newHb / lastHangulBytes;
+      tl.value = clampToUnitRange((+tl.value || 0) * factor);
     }
     lastHangulBytes = newHb;
     updateTargetUnitHint();
+    try{ if(factor !== 1) convertStudentTargetLens(factor); }catch(e){}
+    try{ renderStudents(); }catch(e){}
     try{ updatePreciseLabels(); }catch(e){}
   };
+  /* 공통값이 바뀌면 학생 카드의 placeholder/힌트를 갱신 */
+  tl.addEventListener("input", () => { try{ refreshStudentTargetInputs(); }catch(e){} });
   applyUnitUI();
 })();
 
@@ -1050,7 +1060,7 @@ function buildUserText(){
 function buildUserTextFrom(st){
   const q = String(st.quality||"").trim();
   const ref = String(st.refText||"").trim();
-  const target = st.targetLen;
+  const target = effectiveTargetLen(st);
   let head = "";
   if(st.kind==="교과"){
     const subj = String(st.subject||"").trim() || "(과목 미기재)";
@@ -1823,16 +1833,64 @@ function defaultTargetLen(kind, area){
   const v = (kind==="비교과" && area==="진로") ? 700 : 500;
   return unitConvertFromChar(v);
 }
+/* 카드1(#targetLen)의 공통 목표 분량 — 단일·일괄 공용 기준값 */
+function commonTargetLen(){
+  const el = $("#targetLen");
+  return (+(el && el.value)) || 500;
+}
+/* 학생별 개별 지정값이 실제로 입력되어 있는지 */
+function hasOwnTargetLen(st){
+  const v = +(st && st.targetLen);
+  return isFinite(v) && v > 0;
+}
+/* 실효 목표 분량: 개별 지정값이 있으면 그것, 없으면 카드1 공통값 */
+function effectiveTargetLen(st){
+  const v = +(st && st.targetLen);
+  return (isFinite(v) && v > 0) ? v : commonTargetLen();
+}
 function newStudent(){
   return {
     id: "s" + (++stuSeq) + "_" + Date.now().toString(36),
     name:"", kind:"교과", subject:"", area:"자율", areaDetail:"",
-    quality:"", refText:"", files:[], targetLen:defaultTargetLen("교과","자율"), level:"auto",
+    quality:"", refText:"", files:[], targetLen:null, level:"auto",
     result:null, precompress:null, evals:null, status:"대기", error:null, collapsed:false
   };
 }
-function syncStudentLen(st){
-  st.targetLen = defaultTargetLen(st.kind, st.area);
+/* kind/area가 바뀌어도 사용자가 명시 입력한 개별값은 절대 덮어쓰지 않는다.
+   개별값이 비어 있으면 공통값을 계속 쓰며, 권장치는 힌트로만 안내한다. */
+function syncStudentLen(st){ /* no-op: 개별값 자동 강제 금지 */ }
+/* 개별 목표 분량 입력칸의 안내 문구 */
+function stuTargetHintText(st){
+  const rec = defaultTargetLen(st.kind, st.area);
+  const base = `비우면 카드1의 공통값(${targetLabel(commonTargetLen())})을 사용합니다.`;
+  return (st.kind==="비교과" && st.area==="진로")
+    ? base + ` 진로활동 권장 분량은 ${targetLabel(rec)}입니다.`
+    : base;
+}
+/* 단위/공통값 변경 시 모든 학생 카드의 개별 입력칸 placeholder·범위·힌트 갱신 */
+function refreshStudentTargetInputs(){
+  const wrap = $("#studentList"); if(!wrap) return;
+  const tl = $("#targetLen");
+  const ph = `공통값 ${targetLabel(commonTargetLen())} 사용`;
+  wrap.querySelectorAll(".f-targetLen").forEach(el => {
+    el.placeholder = ph;
+    if(tl){ el.min = tl.min; el.max = tl.max; el.step = tl.step; }
+  });
+  try{
+    wrap.querySelectorAll(".stucard").forEach((d, i) => {
+      const h = d.querySelector(".f-targetLenHint");
+      if(h && students[i]) h.textContent = stuTargetHintText(students[i]);
+    });
+  }catch(e){}
+}
+/* 단위(char↔byte)·한글바이트 변경 시 개별 지정값을 카드1과 동일한 규칙으로 환산 */
+function convertStudentTargetLens(factor){
+  try{
+    students.forEach(s => {
+      const v = +s.targetLen;
+      if(isFinite(v) && v > 0) s.targetLen = clampToUnitRange(v * factor);
+    });
+  }catch(e){}
 }
 function studentLabel(st, i){ return st.name || ("학생" + (i+1)); }
 function studentTarget(st){
@@ -1896,6 +1954,15 @@ function renderStudents(){
                   placeholder="세부 활동/동아리명 (예: 학급 자치회, 과학탐구동아리 'OO')">
          </div>
 
+         <label class="mt14">목표 분량 (비우면 공통값)</label>
+         <input type="number" class="f-targetLen"
+                value="${escAttr(hasOwnTargetLen(st) ? st.targetLen : "")}"
+                placeholder="공통값 ${escAttr(targetLabel(commonTargetLen()))} 사용"
+                min="${escAttr(($("#targetLen")||{}).min || 100)}"
+                max="${escAttr(($("#targetLen")||{}).max || 2000)}"
+                step="${escAttr(($("#targetLen")||{}).step || 50)}">
+         <div class="hint f-targetLenHint">${esc(stuTargetHintText(st))}</div>
+
          <label class="mt14">학생 수준</label>
          <select class="f-level">${levelOptionsHtml(st.level)}</select>
          <div class="hint">산출물을 근거로 해당 수준에 맞는 밀도로 작성합니다. 부정적 표현은 사용하지 않습니다.</div>
@@ -1921,6 +1988,10 @@ function renderStudents(){
   scheduleSave();
 }
 
+function updateStuTargetHint(d, st){
+  const h = d && d.querySelector(".f-targetLenHint");
+  if(h) h.textContent = stuTargetHintText(st);
+}
 function wireStudentCard(d, st, i){
   const head = d.querySelector(".stuhead");
   head.onclick = e => {
@@ -1945,13 +2016,22 @@ function wireStudentCard(d, st, i){
     b.classList.add("on"); st.kind = b.dataset.v;
     d.querySelector(".b-subject").classList.toggle("hidden", st.kind!=="교과");
     d.querySelector(".b-area").classList.toggle("hidden", st.kind!=="비교과");
-    syncStudentLen(st); renderBatchTable(); scheduleSave();
+    syncStudentLen(st); updateStuTargetHint(d, st); renderBatchTable(); scheduleSave();
   });
   d.querySelectorAll(".s-area button").forEach(b => b.onclick = () => {
     d.querySelectorAll(".s-area button").forEach(x => x.classList.remove("on"));
     b.classList.add("on"); st.area = b.dataset.v;
-    syncStudentLen(st); renderBatchTable(); scheduleSave();
+    syncStudentLen(st); updateStuTargetHint(d, st); renderBatchTable(); scheduleSave();
   });
+
+  /* 개별 목표 분량: 비우면 null(=공통값 사용) */
+  const tlEl = d.querySelector(".f-targetLen");
+  if(tlEl) tlEl.oninput = () => {
+    const raw = String(tlEl.value).trim();
+    const v = +raw;
+    st.targetLen = (raw !== "" && isFinite(v) && v > 0) ? v : null;
+    renderBatchTable(); scheduleSave();
+  };
 
   const bind = (sel, key, after) => {
     const el = d.querySelector(sel); if(!el) return;
@@ -2046,7 +2126,7 @@ function showBatchResult(i){
      <div id="batchPrecompressBox"></div>
      <div id="batchReview"></div>`;
   $("#batchOut").textContent = st.result;
-  const target = +st.targetLen || 500;
+  const target = effectiveTargetLen(st);
   const {over, html} = countLine(st.result, target);
   const c = $("#batchCnt");
   c.className = "cnt mt14" + (over ? " over" : "");
@@ -2202,12 +2282,12 @@ async function runBatch(bmode, onlyPending){
       const rawText = buildUserTextFrom(s);
       const fileBlocks = await buildFileBlocksFrom(s.files);
       if(bmode==="quick"){
-        const q = await runQuickCore({rawText, fileBlocks, targetLen: s.targetLen});
+        const q = await runQuickCore({rawText, fileBlocks, targetLen: effectiveTargetLen(s)});
         s.result = q.final; s.precompress = q.precompress;
         s.evals = null;
       } else {
         const r = await runPreciseCore({
-          rawText, fileBlocks, targetLen:s.targetLen,
+          rawText, fileBlocks, targetLen:effectiveTargetLen(s),
           targetScore:pcfg.targetScore, maxRounds:pcfg.maxRounds
         });
         s.result = r.final; s.precompress = r.precompress;
@@ -2259,7 +2339,7 @@ function scheduleSave(){ clearTimeout(saveTimer); saveTimer = setTimeout(saveBat
 function saveBatchState(){
   try{ localStorage.setItem("batchState", JSON.stringify({
     v:1, students:serializeStudents(), pace:getPaceCfg(),
-    unit:getUnit(), hangulBytes:getHangulBytes()
+    unit:getUnit(), hangulBytes:getHangulBytes(), commonTargetLen:commonTargetLen()
   })); }
   catch(e){ /* 용량 초과 등은 무시 */ }
 }
@@ -2267,6 +2347,8 @@ function studentsFromRaw(arr){
   return arr.map(x => {
     const s = Object.assign(newStudent(), x, {files:[], collapsed:true});
     if(!LEVELS[s.level]) s.level = "auto";   // 하위호환: level 없던 저장본
+    // 하위호환: 구버전 저장본의 숫자 targetLen은 '개별 지정'으로 존중, 그 외는 공통값 사용
+    s.targetLen = hasOwnTargetLen(s) ? +s.targetLen : null;
     return s;
   });
 }
@@ -2283,6 +2365,9 @@ function loadBatchState(){
       if(hgEl) hgEl.value = hb;
       lastUnit = u; lastHangulBytes = (hb==="2") ? 2 : 3;
       applyUnitUI();
+      // 공통 목표 분량 복원 (없으면 기존 기본값 유지 — 하위호환)
+      const tl = $("#targetLen"), cv = +(o && o.commonTargetLen);
+      if(tl && isFinite(cv) && cv > 0) tl.value = clampToUnitRange(cv);
     }catch(e){}
     // 페이싱 설정 복원 (없으면 auto 기본 — 하위호환)
     try{
