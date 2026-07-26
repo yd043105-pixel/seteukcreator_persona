@@ -371,6 +371,7 @@
     <div class="toolrow">
       <button class="minibtn" id="batchRetryBtn">🔁 실패/미처리만 재시도</button>
       <button class="minibtn" id="dlTxtBtn">⬇ 텍스트(.txt) 내려받기</button>
+      <button class="minibtn" id="dlXlsxBtn">⬇ 엑셀(.xlsx) 내려받기 (권장)</button>
       <button class="minibtn" id="dlCsvBtn">⬇ CSV(.csv) 내려받기</button>
       <button class="minibtn" id="exportJsonBtn">💾 결과 JSON 내보내기</button>
     </div>
@@ -2222,20 +2223,212 @@ function downloadTxt(){
   if(!out){ showBatchErr("내려받을 결과가 없습니다."); return; }
   dlBlob(out, `세특_일괄_${stampNow()}.txt`, "text/plain;charset=utf-8");
 }
-function downloadCsv(){
-  const rows = [["식별자","구분","과목/영역","글자수","Byte","점수","세특"]];
+/* 수준 값(auto/top/high/mid/low/base 등) -> 한글 짧은 라벨. 빈값/미지값은 "자동". */
+function levelLabel(v){
+  const lv = LEVELS[v] || LEVELS.auto;
+  return lv.short || "자동";
+}
+/* CSV/XLSX 공통: 결과가 있는 학생만 모아 행 데이터로 변환 */
+function collectBatchRows(){
+  const rows = [];
   students.forEach((s, i) => {
     if(!s.result) return;
-    const sc = studentScore(s);
-    rows.push([
-      studentLabel(s, i), s.kind,
-      s.kind==="교과" ? (s.subject||"") : ((AREA_NAMES[s.area]||s.area) + (s.areaDetail ? " / " + s.areaDetail : "")),
-      s.result.length, byteLen(s.result, getHangulBytes()), sc!=null ? sc : "", s.result
-    ]);
+    rows.push({
+      label: studentLabel(s, i),
+      kind: s.kind,
+      subjectArea: s.kind==="교과" ? (s.subject||"") : ((AREA_NAMES[s.area]||s.area) + (s.areaDetail ? " / " + s.areaDetail : "")),
+      level: levelLabel(s.level),
+      charLen: s.result.length,
+      byteLen: byteLen(s.result, getHangulBytes()),
+      score: studentScore(s),
+      result: s.result
+    });
   });
-  if(rows.length === 1){ showBatchErr("내려받을 결과가 없습니다."); return; }
+  return rows;
+}
+function downloadCsv(){
+  const data = collectBatchRows();
+  if(!data.length){ showBatchErr("내려받을 결과가 없습니다."); return; }
+  const rows = [["식별자","구분","과목/영역","수준","글자수","Byte","점수","세특"]];
+  data.forEach(r => rows.push([
+    r.label, r.kind, r.subjectArea, r.level, r.charLen, r.byteLen, r.score!=null ? r.score : "", r.result
+  ]));
   const csv = "﻿" + rows.map(r => r.map(csvEscape).join(",")).join("\r\n");   // BOM: 엑셀 호환
   dlBlob(csv, `세특_일괄_${stampNow()}.csv`, "text/csv;charset=utf-8");
+}
+
+/* ================= XLSX (라이브러리 없이 순수 바이트로 직접 생성) =================
+   ZIP(store, 무압축) 컨테이너 + 최소 SpreadsheetML 파트(inlineStr, 공유문자열 없음)를
+   문자열/바이트 조립만으로 구성한다. 외부 라이브러리·CDN 일절 사용하지 않는다. */
+const CRC_TABLE = (()=>{ const t=new Uint32Array(256);
+  for(let n=0;n<256;n++){ let c=n; for(let k=0;k<8;k++) c = c&1 ? (0xEDB88320 ^ (c>>>1)) : (c>>>1); t[n]=c>>>0; } return t; })();
+function crc32(bytes){ let c=0xFFFFFFFF; for(let i=0;i<bytes.length;i++) c = CRC_TABLE[(c ^ bytes[i]) & 0xFF] ^ (c>>>8); return (c ^ 0xFFFFFFFF)>>>0; }
+function u16le(n){ return [n & 0xFF, (n>>>8) & 0xFF]; }
+function u32le(n){ return [n & 0xFF, (n>>>8) & 0xFF, (n>>>16) & 0xFF, (n>>>24) & 0xFF]; }
+
+/* entries: [{name:string, data:Uint8Array}] -> zip 파일 전체 바이트(Uint8Array) */
+function buildZip(entries){
+  const enc = new TextEncoder();
+  const localParts = [], centralParts = [];
+  let offset = 0;
+  entries.forEach(({name, data}) => {
+    const nameBytes = enc.encode(name);
+    const crc = crc32(data), size = data.length;
+    const localHeader = new Uint8Array([
+      0x50,0x4B,0x03,0x04,        // local file header signature
+      ...u16le(20),                // version needed to extract
+      ...u16le(0x0800),            // general purpose bit flag: UTF-8 filenames
+      ...u16le(0),                 // compression method: 0 = store
+      ...u16le(0), ...u16le(0),    // mod time, mod date
+      ...u32le(crc),
+      ...u32le(size),              // compressed size == uncompressed (store)
+      ...u32le(size),              // uncompressed size
+      ...u16le(nameBytes.length),
+      ...u16le(0)                  // extra field length
+    ]);
+    localParts.push(localHeader, nameBytes, data);
+    const centralHeader = new Uint8Array([
+      0x50,0x4B,0x01,0x02,        // central directory file header signature
+      ...u16le(20), ...u16le(20), // version made by, version needed
+      ...u16le(0x0800),
+      ...u16le(0),
+      ...u16le(0), ...u16le(0),
+      ...u32le(crc),
+      ...u32le(size),
+      ...u32le(size),
+      ...u16le(nameBytes.length),
+      ...u16le(0),                 // extra field length
+      ...u16le(0),                 // file comment length
+      ...u16le(0),                 // disk number start
+      ...u16le(0),                 // internal file attributes
+      ...u32le(0),                 // external file attributes
+      ...u32le(offset)             // relative offset of local header
+    ]);
+    centralParts.push(centralHeader, nameBytes);
+    offset += localHeader.length + nameBytes.length + data.length;
+  });
+  const centralStart = offset;
+  let centralSize = 0;
+  centralParts.forEach(p => centralSize += p.length);
+  const eocd = new Uint8Array([
+    0x50,0x4B,0x05,0x06,          // end of central directory signature
+    ...u16le(0), ...u16le(0),     // disk number, disk with central dir start
+    ...u16le(entries.length),     // entries on this disk
+    ...u16le(entries.length),     // total entries
+    ...u32le(centralSize),
+    ...u32le(centralStart),
+    ...u16le(0)                   // comment length
+  ]);
+  const total = offset + centralSize + eocd.length;
+  const out = new Uint8Array(total);
+  let p = 0;
+  [...localParts, ...centralParts, eocd].forEach(part => { out.set(part, p); p += part.length; });
+  return out;
+}
+
+/* XML 텍스트 노드 이스케이프 + XML1.0 불법 제어문자(탭·개행 제외) 제거 */
+function xmlEscape(v){
+  return String(v==null ? "" : v)
+    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+/* 0-based 열 인덱스 -> 엑셀 열 문자(A, B, ..., Z, AA, AB, ...) */
+function xlsxColLetter(idx){
+  let s = "", n = idx + 1;
+  while(n > 0){ const rem = (n - 1) % 26; s = String.fromCharCode(65 + rem) + s; n = Math.floor((n - 1) / 26); }
+  return s;
+}
+const XLSX_HEADERS = ["식별자","구분","과목/영역","수준","글자수","Byte","점수","세특"];
+function xlsxSheetXml(rows){
+  let body = "<row r=\"1\">" + XLSX_HEADERS.map((h, ci) =>
+    `<c r="${xlsxColLetter(ci)}1" t="inlineStr" s="1"><is><t xml:space="preserve">${xmlEscape(h)}</t></is></c>`
+  ).join("") + "</row>";
+  rows.forEach((r, ri) => {
+    const rn = ri + 2;
+    const strCell = (col, val, styleAttr) => `<c r="${col}${rn}"${styleAttr||""} t="inlineStr"><is><t xml:space="preserve">${xmlEscape(val)}</t></is></c>`;
+    const numCell = (col, val) => `<c r="${col}${rn}"><v>${val}</v></c>`;
+    const cells = [
+      strCell("A", r.label), strCell("B", r.kind), strCell("C", r.subjectArea), strCell("D", r.level),
+      numCell("E", r.charLen), numCell("F", r.byteLen),
+      r.score != null ? numCell("G", r.score) : strCell("G", ""),
+      strCell("H", r.result, " s=\"2\"")
+    ];
+    body += `<row r="${rn}">${cells.join("")}</row>`;
+  });
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n` +
+    `<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">` +
+    `<cols>` +
+    `<col min="1" max="1" width="14" customWidth="1"/>` +
+    `<col min="2" max="2" width="10" customWidth="1"/>` +
+    `<col min="3" max="3" width="22" customWidth="1"/>` +
+    `<col min="4" max="4" width="8" customWidth="1"/>` +
+    `<col min="5" max="5" width="10" customWidth="1"/>` +
+    `<col min="6" max="6" width="10" customWidth="1"/>` +
+    `<col min="7" max="7" width="8" customWidth="1"/>` +
+    `<col min="8" max="8" width="80" customWidth="1"/>` +
+    `</cols>` +
+    `<sheetData>${body}</sheetData></worksheet>`;
+}
+function xlsxParts(rows){
+  const contentTypes = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n` +
+    `<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">` +
+    `<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>` +
+    `<Default Extension="xml" ContentType="application/xml"/>` +
+    `<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>` +
+    `<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>` +
+    `<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>` +
+    `</Types>`;
+  const rootRels = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n` +
+    `<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">` +
+    `<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>` +
+    `</Relationships>`;
+  const workbook = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n` +
+    `<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">` +
+    `<sheets><sheet name="세특" sheetId="1" r:id="rId1"/></sheets></workbook>`;
+  const workbookRels = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n` +
+    `<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">` +
+    `<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>` +
+    `<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>` +
+    `</Relationships>`;
+  const styles = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n` +
+    `<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">` +
+    `<fonts count="2"><font><sz val="11"/><name val="맑은 고딕"/></font><font><b/><sz val="11"/><name val="맑은 고딕"/></font></fonts>` +
+    `<fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills>` +
+    `<borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders>` +
+    `<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>` +
+    `<cellXfs count="3">` +
+    `<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>` +
+    `<xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/>` +
+    `<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0" applyAlignment="1"><alignment wrapText="1" vertical="top"/></xf>` +
+    `</cellXfs></styleSheet>`;
+  return [
+    {name:"[Content_Types].xml", data: contentTypes},
+    {name:"_rels/.rels", data: rootRels},
+    {name:"xl/workbook.xml", data: workbook},
+    {name:"xl/_rels/workbook.xml.rels", data: workbookRels},
+    {name:"xl/styles.xml", data: styles},
+    {name:"xl/worksheets/sheet1.xml", data: xlsxSheetXml(rows)}
+  ];
+}
+/* 문자열/바이너리 겸용 다운로드: Uint8Array를 그대로 Blob에 담는다 (dlBlob은 문자열 전제라 별도 함수로 분리) */
+function dlBytes(bytes, filename, mime){
+  const b = new Blob([bytes], {type:mime});
+  const u = URL.createObjectURL(b);
+  const a = document.createElement("a");
+  a.href = u; a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(u), 1000);
+}
+function downloadXlsx(){
+  const rows = collectBatchRows();
+  if(!rows.length){ showBatchErr("내려받을 결과가 없습니다."); return; }
+  const enc = new TextEncoder();
+  const entries = xlsxParts(rows).map(p => ({name: p.name, data: enc.encode(p.data)}));
+  const zipBytes = buildZip(entries);
+  dlBytes(zipBytes, `세특_일괄_${stampNow()}.xlsx`, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
 }
 function exportBatchJson(){
   dlBlob(JSON.stringify({v:1, students:serializeStudents()}, null, 2),
@@ -2288,6 +2481,7 @@ $("#batchStopBtn").onclick = () => {
 })();
 
 $("#dlTxtBtn").onclick = downloadTxt;
+$("#dlXlsxBtn").onclick = downloadXlsx;
 $("#dlCsvBtn").onclick = downloadCsv;
 $("#exportJsonBtn").onclick = exportBatchJson;
 $("#importJsonBtn").onclick = () => $("#importJsonInput").click();
