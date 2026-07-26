@@ -289,6 +289,10 @@
         <button data-v="진로" data-len="700">진로활동</button>
         <button data-v="동아리" data-len="500">동아리활동</button>
       </div>
+      <div class="hint" id="areaRecoHint" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <span id="areaRecoText"></span>
+        <button class="minibtn" type="button" id="applyRecoLenBtn" style="padding:4px 9px;font-size:12px">권장값 적용</button>
+      </div>
       <input type="text" id="areaDetail" class="mt14" placeholder="세부 활동/동아리명 (예: 학급 자치회, 과학탐구동아리 'OO', 진로독서 프로그램)">
     </div>
   </div>
@@ -332,9 +336,11 @@
   <div class="card hidden" id="batchCard">
     <h2><span class="n">👥</span> 학생 목록</h2>
     <div class="note hidden" id="batchRestoreNote">이전 작업을 복원했습니다. 첨부 파일은 다시 첨부해 주세요.</div>
+    <div class="note hidden" id="batchInfoNote"></div>
     <div id="studentList"></div>
     <div class="toolrow">
       <button class="minibtn" id="addStudentBtn">➕ 학생 추가</button>
+      <button class="minibtn" id="resetStuTargetBtn">🎯 목표 분량 모두 공통값으로</button>
       <button class="minibtn" id="importJsonBtn">📂 결과 JSON 불러오기</button>
       <input type="file" id="importJsonInput" accept=".json,application/json" style="display:none">
     </div>
@@ -654,10 +660,34 @@ $("#areaSeg").querySelectorAll("button").forEach(b => b.onclick = () => {
   $("#areaSeg").querySelectorAll("button").forEach(x=>x.classList.remove("on"));
   b.classList.add("on"); area = b.dataset.v; syncTargetLen();
 });
-function syncTargetLen(){
-  const v = (kind==="비교과") ? +$("#areaSeg").querySelector("button.on").dataset.len : 500;
-  $("#targetLen").value = clampToUnitRange(unitConvertFromChar(v));
+/* 카드1(#targetLen)은 단일·일괄 공용 값이므로 구분/영역 변경으로 절대 덮어쓰지 않는다.
+   권장 분량은 힌트로만 안내하고, 사용자가 원할 때만 '권장값 적용' 버튼으로 반영한다. */
+function recommendedTargetLenChar(){
+  if(kind!=="비교과") return 500;
+  const b = $("#areaSeg").querySelector("button.on");
+  return (b && +b.dataset.len) || 500;
 }
+function updateAreaRecoHint(){
+  const box = $("#areaRecoHint"), txt = $("#areaRecoText");
+  if(!box || !txt) return;
+  const rec = clampToUnitRange(unitConvertFromChar(recommendedTargetLenChar()));
+  const cur = commonTargetLen();
+  txt.textContent = `권장 분량 ${targetLabel(rec)} · 현재 목표 분량은 ${targetLabel(cur)}입니다. (자동으로 바뀌지 않습니다)`;
+  const btn = $("#applyRecoLenBtn");
+  if(btn) btn.classList.toggle("hidden", rec === cur);
+}
+function syncTargetLen(){ updateAreaRecoHint(); }
+(function wireRecoLen(){
+  const btn = $("#applyRecoLenBtn"); if(!btn) return;
+  btn.onclick = () => {
+    const tl = $("#targetLen"); if(!tl) return;
+    tl.value = clampToUnitRange(unitConvertFromChar(recommendedTargetLenChar()));
+    try{ refreshStudentTargetInputs(); }catch(e){}
+    try{ updatePreciseLabels(); }catch(e){}
+    try{ scheduleSave(); }catch(e){}
+    updateAreaRecoHint();
+  };
+})();
 
 /* ================= 분량 단위 (글자 수 / Byte) =================
    생기부 기재 한도는 실제로는 Byte(예: 세특 500자=1,500Byte)로 관리되며,
@@ -709,6 +739,7 @@ function applyUnitUI(){
     else { tl.min = 100; tl.max = 2000; tl.step = 50; }
   }
   updateTargetUnitHint();
+  try{ updateAreaRecoHint(); }catch(e){}
 }
 function updateTargetUnitHint(){
   const hint = $("#targetUnitHint"); if(!hint) return;
@@ -749,7 +780,11 @@ let lastUnit = "char", lastHangulBytes = 3;
     try{ updatePreciseLabels(); }catch(e){}
   };
   /* 공통값이 바뀌면 학생 카드의 placeholder/힌트를 갱신 */
-  tl.addEventListener("input", () => { try{ refreshStudentTargetInputs(); }catch(e){} });
+  tl.addEventListener("input", () => {
+    try{ refreshStudentTargetInputs(); }catch(e){}
+    try{ updateAreaRecoHint(); }catch(e){}
+    try{ scheduleSave(); }catch(e){}
+  });
   applyUnitUI();
 })();
 
@@ -2336,21 +2371,45 @@ function serializeStudents(){
 }
 let saveTimer = null;
 function scheduleSave(){ clearTimeout(saveTimer); saveTimer = setTimeout(saveBatchState, 400); }
+/* 학생 targetLen 저장 포맷 버전.
+   1 이하(=마커 없음): 구버전은 targetLen을 사용자 의도와 무관하게 자동으로 채웠으므로
+   불러올 때 전부 null로 마이그레이션하여 카드1 공통값을 쓰게 한다.
+   2: targetLen에 값이 있으면 사용자가 직접 지정한 개별값이므로 그대로 존중한다. */
+const STV = 2;
+let targetLenMigrated = false;
 function saveBatchState(){
   try{ localStorage.setItem("batchState", JSON.stringify({
-    v:1, students:serializeStudents(), pace:getPaceCfg(),
+    v:1, stv:STV, students:serializeStudents(), pace:getPaceCfg(),
     unit:getUnit(), hangulBytes:getHangulBytes(), commonTargetLen:commonTargetLen()
   })); }
   catch(e){ /* 용량 초과 등은 무시 */ }
 }
-function studentsFromRaw(arr){
+/* 복원 안내문 갱신 (마이그레이션이 있었으면 그 사실을 덧붙인다) */
+function showBatchRestoreNote(){
+  const el = $("#batchRestoreNote"); if(!el) return;
+  el.textContent = "이전 작업을 복원했습니다. 첨부 파일은 다시 첨부해 주세요."
+    + (targetLenMigrated
+        ? " 이전 버전에서 자동 설정된 학생별 목표 분량은 공통값으로 초기화했습니다."
+        : "");
+  el.classList.remove("hidden");
+}
+function studentsFromRaw(arr, legacy){
   return arr.map(x => {
     const s = Object.assign(newStudent(), x, {files:[], collapsed:true});
     if(!LEVELS[s.level]) s.level = "auto";   // 하위호환: level 없던 저장본
-    // 하위호환: 구버전 저장본의 숫자 targetLen은 '개별 지정'으로 존중, 그 외는 공통값 사용
-    s.targetLen = hasOwnTargetLen(s) ? +s.targetLen : null;
+    if(legacy){
+      // 구버전 저장본: 자동으로 채워진 값이므로 개별 지정으로 존중하지 않고 폐기
+      if(hasOwnTargetLen(s)) targetLenMigrated = true;
+      s.targetLen = null;
+    }else{
+      s.targetLen = hasOwnTargetLen(s) ? +s.targetLen : null;
+    }
     return s;
   });
+}
+/* 저장본/JSON의 stv 마커로 레거시 여부 판단 (배열만 있던 아주 옛 포맷도 레거시) */
+function isLegacyTargetLen(o){
+  return !(o && !Array.isArray(o) && (+o.stv >= 2));
 }
 function loadBatchState(){
   try{
@@ -2379,7 +2438,7 @@ function loadBatchState(){
     }catch(e){}
     const arr = Array.isArray(o) ? o : (o && o.students);
     if(!Array.isArray(arr) || !arr.length) return false;
-    students = studentsFromRaw(arr);
+    students = studentsFromRaw(arr, isLegacyTargetLen(o));
     return true;
   }catch(e){ return false; }
 }
@@ -2619,7 +2678,7 @@ function downloadXlsx(){
   dlBytes(zipBytes, `세특_일괄_${stampNow()}.xlsx`, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
 }
 function exportBatchJson(){
-  dlBlob(JSON.stringify({v:1, students:serializeStudents()}, null, 2),
+  dlBlob(JSON.stringify({v:1, stv:STV, students:serializeStudents()}, null, 2),
          `세특_일괄_${stampNow()}.json`, "application/json");
 }
 function importBatchJson(file){
@@ -2629,9 +2688,10 @@ function importBatchJson(file){
       const o = JSON.parse(r.result);
       const arr = Array.isArray(o) ? o : (o && o.students);
       if(!Array.isArray(arr) || !arr.length) throw new Error("학생 데이터가 없습니다.");
-      students = studentsFromRaw(arr);
+      targetLenMigrated = false;
+      students = studentsFromRaw(arr, isLegacyTargetLen(o));
       renderStudents(); renderBatchTable(); saveBatchState();
-      $("#batchRestoreNote").classList.remove("hidden");
+      showBatchRestoreNote();
       showBatchErr("");
     }catch(e){ showBatchErr("JSON 불러오기 실패: " + e.message); }
   };
@@ -2646,6 +2706,20 @@ $("#modeSeg").querySelectorAll("button").forEach(b => b.onclick = () => {
 });
 $("#addStudentBtn").onclick = () => {
   students.push(newStudent()); renderStudents(); renderBatchTable();
+};
+/* 짧은 안내 표시 (몇 초 후 자동 숨김) */
+let batchInfoTimer = null;
+function showBatchInfo(msg){
+  const el = $("#batchInfoNote"); if(!el) return;
+  el.textContent = msg; el.classList.remove("hidden");
+  clearTimeout(batchInfoTimer);
+  batchInfoTimer = setTimeout(() => { el.classList.add("hidden"); el.textContent = ""; }, 6000);
+}
+/* 탈출구: 모든 학생의 개별 목표 분량을 비워 카드1 공통값을 쓰게 한다 */
+$("#resetStuTargetBtn").onclick = () => {
+  students.forEach(s => { s.targetLen = null; });
+  renderStudents(); renderBatchTable(); saveBatchState();
+  showBatchInfo(`모든 학생의 목표 분량을 공통값(${targetLabel(commonTargetLen())})으로 맞췄습니다.`);
 };
 $("#batchQuickBtn").onclick = () => runBatch("quick", false);
 $("#batchPreciseBtn").onclick = () => runBatch("precise", false);
@@ -2686,12 +2760,13 @@ $("#importJsonInput").onchange = e => {
 })();
 
 /* ---- 배치 초기화 ---- */
-if(loadBatchState()) $("#batchRestoreNote").classList.remove("hidden");
+if(loadBatchState()) showBatchRestoreNote();
 if(!students.length) students.push(newStudent());
 renderStudents();
 renderBatchTable();
 updatePaceInfo();
 updatePreciseLabels();
+updateAreaRecoHint();
 applyGenMode();
 </script>
 </body>
