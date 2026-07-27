@@ -411,6 +411,7 @@
     </div>
     <div class="out empty" id="output">여기에 세특이 생성됩니다.</div>
     <div class="cnt mt14" id="counter" style="display:none"></div>
+    <div id="shortfallBox"></div>
     <div id="precompressBox"></div>
     <div id="reviewBox"></div>
   </div>
@@ -1041,6 +1042,8 @@ const SYSTEM_PROMPT = `당신은 대한민국 고등학교 학교생활기록부
 - 금지사항: 수상 실적, 모의고사·석차 등급, 교외 활동/어학연수, 부모·친인척 정보, 특정 대학·기관명, 학생 실명, 봉사 시간 수치 등 기재 금지 항목은 넣지 않는다.
 - 생성형 AI, 인공지능 도구, 챗봇 활용 등의 표현을 절대 쓰지 않는다. 학생 활동이 AI를 사용했더라도 세특에는 언급하지 않는다.
 - '교과 범위를 넘어선', '대학 수준의', '고교 과정을 초월한' 등 교육과정 범위 초과·선행학습을 암시하는 표현을 쓰지 않는다. 심화 탐구는 '교육과정에서 배운 개념을 확장·연결하여'처럼 교육과정 내 심화로 서술한다.
+- 수식 기호를 사용하지 않는다. 라텍스·마크다운 수식 표기(달러 기호, 역슬래시 명령, 밑줄·윗첨자 기호, 중괄호 등)를 절대 쓰지 말고, 수식이 필요하면 말로 풀어 서술한다. (예: 출력 전압이 두 입력의 차에 이득을 곱한 값이라는 수식을 쓰지 말고 '두 전극의 전위차를 차동 증폭기로 증폭하는 관계를 이용하여'처럼 서술)
+- 영문 약어를 남용하지 않는다. 한글 용어를 우선 사용하고, 꼭 필요한 전문 용어만 최초 1회에 한해 괄호로 원어를 병기한다(예: 이온 감응 전계효과 트랜지스터(ISFET)). 한 문단에 영문 약어가 3개를 넘지 않도록 하고, 이후에는 한글 용어로만 지칭한다.
 - 분량: 지정된 목표 분량(공백 포함, 글자 수 또는 Byte 기준)을 절대 초과하지 않는다. 목표의 약 90~100% 수준으로 목표에 가깝게 충실히 작성하고, 초과가 예상되면 수식어와 중복 표현을 줄여 핵심만 남긴다.
 - 하나의 완결된 문단으로 작성하고, 불필요한 머리말·설명·따옴표 없이 세특 본문만 출력한다.`;
 
@@ -1050,7 +1053,10 @@ const COMMON_EVAL = `당신은 대한민국 주요 대학 학생부종합전형 
 [세특 금지 규칙 — 평가와 개선 지시 모두에 적용]
 - 생성형 AI, 인공지능 도구, 챗봇 활용 등의 표현을 절대 쓰지 않는다. 학생 활동이 AI를 사용했더라도 세특에는 언급하지 않는다.
 - '교과 범위를 넘어선', '대학 수준의', '고교 과정을 초월한' 등 교육과정 범위 초과·선행학습을 암시하는 표현을 쓰지 않는다. 심화 탐구는 '교육과정에서 배운 개념을 확장·연결하여'처럼 교육과정 내 심화로 서술한다.
+- 수식 기호를 사용하지 않는다. 라텍스·마크다운 수식 표기(달러 기호, 역슬래시 명령, 밑줄·윗첨자 기호, 중괄호 등)를 절대 쓰지 말고, 수식이 필요하면 말로 풀어 서술한다. (예: 출력 전압이 두 입력의 차에 이득을 곱한 값이라는 수식을 쓰지 말고 '두 전극의 전위차를 차동 증폭기로 증폭하는 관계를 이용하여'처럼 서술)
+- 영문 약어를 남용하지 않는다. 한글 용어를 우선 사용하고, 꼭 필요한 전문 용어만 최초 1회에 한해 괄호로 원어를 병기한다(예: 이온 감응 전계효과 트랜지스터(ISFET)). 한 문단에 영문 약어가 3개를 넘지 않도록 하고, 이후에는 한글 용어로만 지칭한다.
 - improvements에 생성형 AI 활용 언급이나 교과 범위 초과 서술을 추가하라는 지시를 절대 하지 말 것.
+- improvements나 to_perfect에 수식 표기나 영문 약어를 추가하라는 지시를 하지 말 것. 오히려 수식·영문 약어가 과다하면 감점하고 한글 서술로 바꾸도록 지시할 것.
 
 [학생 수준 지정에 대한 평가 적용 지침]
 원자료에 [학생 수준]이 지정되어 있습니다. 평가 기준(항목·가중치·엄격함)은 지정 수준과 무관하게 동일하게 유지하되, '그 수준의 학생이 제출한 산출물을 얼마나 충실히 살렸는가'를 기준으로 평가하세요. 더 높은 수준의 학생에게 기대할 성취가 산출물에 없다는 이유로 감점하지 마세요. 또한 낮은 수준으로 지정되었다는 이유로 부정적·평가절하 표현을 추가하라고 지시하지 마세요(학생부 기재 위반입니다).
@@ -1076,7 +1082,7 @@ const EVALUATORS = [
     `당신은 교육부 학교생활기록부 기재요령에 정통한 베테랑 교사입니다. 관점: (1) 금지사항 위반 여부 — 수상 실적, 모의고사/석차, 교외 활동, 특정 대학·기관명, 학생 실명, 부모 정보, 어학 성적 등이 있으면 score를 40 이하로 주고 반드시 improvements에 삭제 지시. (2) 문체 — 명사형 종결('~함', '~을 보임', '~하였음')의 일관성, 한 문단 서술형. (3) 구체성 — 행동·과정 중심 서술, 동기→과정→성장 흐름. (4) 분량 — 목표 분량(글자 수 또는 Byte 기준) 준수. 위반 사항을 구체적으로 지적하세요.` }
 ];
 
-const CHAIR_PROMPT = `당신은 대학 입학사정관실의 종합평가위원장이며 동시에 학교생활기록부 작성 최고 전문가입니다. 세특 초안과 4명의 전문 평가위원(학업역량·진로역량·공동체역량·기재요령)의 평가 결과를 모두 반영하여 최종 완성본 세특을 작성합니다. 원칙: (1) improvements의 수정 지시를 최대한 반영하되 서로 충돌하면 학업역량>진로역량>기재요령>공동체역량 순으로 우선. (2) 명사형 종결 서술형 한 문단. (3) 금지사항 배제. (4) 목표 분량(공백 포함, 글자 수 또는 Byte 기준)을(를) 절대 초과하지 않으며 목표의 약 90~100% 수준으로 목표에 가깝게 충실히 작성하고 — 초과 시 핵심을 남기고 압축한다. (5) 학생 원자료에 없는 사실을 새로 지어내지 않기 — 기존 사실의 서술 방식만 개선. (6) 생성형 AI·인공지능 도구·챗봇 활용 언급을 절대 쓰지 않는다(학생이 AI를 썼더라도 세특에 언급 금지). (7) '교과 범위를 넘어선'·'대학 수준의'·'고교 과정을 초월한' 등 교육과정 범위 초과·선행학습 암시 표현을 쓰지 않고, 심화는 '교육과정에서 배운 개념을 확장·연결하여'처럼 교육과정 내 심화로 서술한다. (8) 원자료에 지정된 [학생 수준]에 맞는 밀도·깊이로 쓰되, 낮은 수준이라도 부정적·평가절하 표현('미흡함', '부족함', '어려워함')을 절대 쓰지 않고, 높은 수준이라도 원자료에 없는 사실을 만들어내지 않는다. 수준은 서술의 밀도를 조절하는 기준이지 사실을 바꾸는 기준이 아니다. (9) '반영 불가(원자료 근거 없음)'으로 표시된 항목은 무리해서 넣지 말고 무시한다. 최종 세특 본문만 출력하세요. 머리말·설명·따옴표 금지.`;
+const CHAIR_PROMPT = `당신은 대학 입학사정관실의 종합평가위원장이며 동시에 학교생활기록부 작성 최고 전문가입니다. 세특 초안과 4명의 전문 평가위원(학업역량·진로역량·공동체역량·기재요령)의 평가 결과를 모두 반영하여 최종 완성본 세특을 작성합니다. 원칙: (1) improvements의 수정 지시를 최대한 반영하되 서로 충돌하면 학업역량>진로역량>기재요령>공동체역량 순으로 우선. (2) 명사형 종결 서술형 한 문단. (3) 금지사항 배제. (4) 목표 분량(공백 포함, 글자 수 또는 Byte 기준)을(를) 절대 초과하지 않으며 목표의 약 90~100% 수준으로 목표에 가깝게 충실히 작성하고 — 초과 시 핵심을 남기고 압축한다. (5) 학생 원자료에 없는 사실을 새로 지어내지 않기 — 기존 사실의 서술 방식만 개선. (6) 생성형 AI·인공지능 도구·챗봇 활용 언급을 절대 쓰지 않는다(학생이 AI를 썼더라도 세특에 언급 금지). (7) '교과 범위를 넘어선'·'대학 수준의'·'고교 과정을 초월한' 등 교육과정 범위 초과·선행학습 암시 표현을 쓰지 않고, 심화는 '교육과정에서 배운 개념을 확장·연결하여'처럼 교육과정 내 심화로 서술한다. (8) 원자료에 지정된 [학생 수준]에 맞는 밀도·깊이로 쓰되, 낮은 수준이라도 부정적·평가절하 표현('미흡함', '부족함', '어려워함')을 절대 쓰지 않고, 높은 수준이라도 원자료에 없는 사실을 만들어내지 않는다. 수준은 서술의 밀도를 조절하는 기준이지 사실을 바꾸는 기준이 아니다. (9) '반영 불가(원자료 근거 없음)'으로 표시된 항목은 무리해서 넣지 말고 무시한다. (10) 수식 기호를 사용하지 않는다 — 라텍스·마크다운 수식 표기(달러 기호, 역슬래시 명령, 밑줄·윗첨자 기호, 중괄호 등)를 절대 쓰지 말고, 수식이 필요하면 말로 풀어 서술한다(예: 출력 전압이 두 입력의 차에 이득을 곱한 값이라는 수식을 쓰지 말고 '두 전극의 전위차를 차동 증폭기로 증폭하는 관계를 이용하여'처럼 서술). (11) 영문 약어를 남용하지 않는다 — 한글 용어를 우선 사용하고, 꼭 필요한 전문 용어만 최초 1회에 한해 괄호로 원어를 병기하며(예: 이온 감응 전계효과 트랜지스터(ISFET)), 한 문단에 영문 약어가 3개를 넘지 않도록 한다. 최종 세특 본문만 출력하세요. 머리말·설명·따옴표 금지.`;
 
 /* ---- 프롬프트 구성 ---- */
 /* 현재 폼 값으로 st를 만들어 buildUserTextFrom에 위임하는 얇은 래퍼 */
@@ -1217,6 +1223,7 @@ function beginOutput(){
   $("#copyBtn").style.display="none"; $("#counter").style.display="none";
   $("#reviewBox").innerHTML=""; $("#errBox").innerHTML="";
   const pb = $("#precompressBox"); if(pb) pb.innerHTML="";
+  const sb = $("#shortfallBox"); if(sb) sb.innerHTML="";
 }
 function setBusy(on, mode){
   quickBtn.disabled = on; preciseBtn.disabled = on;
@@ -1268,7 +1275,66 @@ async function run(mode){
 
 /* ================= 분량 강제 압축/절단 (LLM은 글자·Byte 수를 정확히 세지 못하므로
    생성 후 실제로 measure()하여 초과분을 압축 → 그래도 초과하면 하드 절단한다) ================= */
-const COMPRESS_SYS = `당신은 학교생활기록부 세특 편집 전문가입니다. 주어진 세특을 의미와 근거를 유지한 채 목표 분량 이하로 자연스럽게 압축합니다. 규칙: 명사형 종결(~함/~음/~하였음), 한 문단 서술형, 문장을 완결할 것, 핵심 활동·탐구 과정·성장은 남기고 수식어·중복 표현을 줄인다. 생성형 AI·인공지능 언급 금지, 교육과정 범위 초과 표현 금지. 세특 본문만 출력한다.`;
+const COMPRESS_SYS = `당신은 학교생활기록부 세특 편집 전문가입니다. 주어진 세특을 의미와 근거를 유지한 채 목표 분량 이하로 자연스럽게 압축합니다. 규칙: 명사형 종결(~함/~음/~하였음), 한 문단 서술형, 문장을 완결할 것, 핵심 활동·탐구 과정·성장은 남기고 수식어·중복 표현을 줄인다. 생성형 AI·인공지능 언급 금지, 교육과정 범위 초과 표현 금지. 수식 기호(라텍스·마크다운 수식 표기)를 쓰지 말고 말로 풀어 서술하며, 영문 약어는 남용하지 말고 꼭 필요한 것만 최초 1회 괄호 병기한다. 세특 본문만 출력한다.`;
+
+/* ---- 목표 분량 하한(95%) — 이 미만이면 확장한다 ---- */
+const MIN_FILL_RATIO = 0.95;
+
+const EXPAND_SYS = `당신은 학교생활기록부 세특 편집 전문가입니다. 주어진 세특을 목표 분량에 맞게 자연스럽게 보강합니다. 규칙: 원자료에 없는 사실을 절대 창작하지 않는다. 이미 언급된 활동의 동기·과정·방법·결과 해석·성장을 더 구체적으로 풀어 서술하여 분량을 늘린다. 의미 없는 미사여구나 같은 말 반복으로 늘리지 않는다. 명사형 종결(~함/~음/~하였음), 한 문단 서술형. 세특 본문만 출력한다. 수식 기호를 사용하지 않는다. 라텍스·마크다운 수식 표기(달러 기호, 역슬래시 명령, 밑줄·윗첨자 기호, 중괄호 등)를 절대 쓰지 말고, 수식이 필요하면 말로 풀어 서술한다. (예: 출력 전압이 두 입력의 차에 이득을 곱한 값이라는 수식을 쓰지 말고 '두 전극의 전위차를 차동 증폭기로 증폭하는 관계를 이용하여'처럼 서술) 영문 약어를 남용하지 않는다. 한글 용어를 우선 사용하고, 꼭 필요한 전문 용어만 최초 1회에 한해 괄호로 원어를 병기한다(예: 이온 감응 전계효과 트랜지스터(ISFET)). 한 문단에 영문 약어가 3개를 넘지 않도록 하고, 이후에는 한글 용어로만 지칭한다.`;
+
+/* ---- 수식·과잉 영문약어 사후 정리 (세이프티 넷) ---- */
+const SANITIZE_SYS = `당신은 학교생활기록부 세특 편집 전문가입니다. 주어진 세특에서 수식 표기와 과도한 영문 약어만 자연스러운 한글 서술로 바꿉니다. 규칙: 내용·사실·분량을 최대한 유지하고 새로운 사실을 추가하지 않는다. 라텍스·마크다운 수식 기호를 모두 제거하고 의미를 말로 풀어 쓴다. 영문 약어는 한글 용어 위주로 바꾸되 꼭 필요한 것만 최초 1회 괄호 병기한다. 명사형 종결(~함/~음/~하였음), 한 문단 서술형 유지. 세특 본문만 출력한다.`;
+
+/* 수식 표기(라텍스·마크다운) 포함 여부 판정 — 평범한 한글 문장에서는 false여야 함 */
+function hasMathMarkup(s){
+  const t = String(s||"");
+  if(/\$[^$\n]{1,200}\$/.test(t)) return true;
+  if(/\\[()\[\]]/.test(t)) return true;
+  if(/\\frac/.test(t)) return true;
+  if(/[_^]\{/.test(t)) return true;
+  if(/\\[a-zA-Z]+/.test(t)) return true;
+  return false;
+}
+
+/* AI 호출 실패 시 보수적 정규식 폴백으로 수식 표기 제거 */
+function stripMathFallback(text){
+  let t = String(text||"");
+  // \frac{a}{b} -> a/b (단순 중첩 없는 형태만)
+  t = t.replace(/\\frac\{([^{}]*)\}\{([^{}]*)\}/g, "$1/$2");
+  // \( \) \[ \] 제거
+  t = t.replace(/\\[()\[\]]/g, "");
+  // \alpha 같은 \영문명령 제거
+  t = t.replace(/\\[a-zA-Z]+/g, "");
+  // _{...} / ^{...} -> 공백 + 중괄호 안 내용
+  t = t.replace(/[_^]\{([^{}]*)\}/g, " $1");
+  // _x / ^x (중괄호 없는 단일 문자)
+  t = t.replace(/[_^]([0-9A-Za-z가-힣])/g, " $1");
+  // 남은 $ 전부 제거
+  t = t.replace(/\$/g, "");
+  // 남은 고립 중괄호 제거
+  t = t.replace(/[{}]/g, "");
+  // 공백/문장부호 정리
+  t = t.replace(/[ \t]{2,}/g, " ").replace(/\s+([.,·])/g, "$1").trim();
+  return t;
+}
+
+async function sanitizeMath(text, {onDelta} = {}){
+  const src = String(text||"");
+  if(!hasMathMarkup(src)) return src;
+  try{
+    const out = await callAI({
+      system: SANITIZE_SYS,
+      content:[{kind:"text", text:`아래 세특에서 수식 표기와 과도한 영문 약어만 한글 서술로 바꿔 주세요. 내용과 분량은 최대한 유지하세요.\n\n[세특]\n${src}`}],
+      maxTokens: Math.max(1200, src.length*3), stream:false
+    });
+    if(out && out.trim() && !hasMathMarkup(out)){
+      const t = out.trim(); onDelta && onDelta(t); return t;
+    }
+  }catch(e){}
+  const fb = stripMathFallback(src);
+  onDelta && onDelta(fb);
+  return fb;
+}
 
 function trimToLimit(text, limit){
   const src = String(text||"");
@@ -1327,6 +1393,91 @@ async function enforceLength(text, {targetLen, onDelta} = {}){
   return {text, precompress:original};
 }
 
+/* ---- 확장 시도 상한 / 압축 시도 상한 / 정체 판정 기준(목표의 2%) ---- */
+const MAX_EXPAND_TRIES = 6;
+const MAX_COMPRESS_TRIES = 3;
+const EXPAND_STALL_RATIO = 0.02;
+
+/* 부족분을 구체적 수치로 알려 주는 확장 지시문 (현재 단위 기준) */
+function expandNeedMsg(m, limit, minLen){
+  const pct = Math.round(m / limit * 100);
+  const need = Math.max(1, limit - m);
+  const isByte = getUnit()==="byte";
+  const needTxt = isByte
+    ? `약 ${need.toLocaleString()}Byte(한글 약 ${Math.round(need/getHangulBytes()).toLocaleString()}자)`
+    : `약 ${need.toLocaleString()}자`;
+  return `목표 분량: ${targetLabel(limit)}. 현재 ${targetLabel(m)}로 목표의 ${pct}%입니다. ${needTxt} 더 보강해야 합니다. `
+       + `목표의 95~100% 범위(${targetLabel(minLen)}~${targetLabel(limit)})가 되도록 늘리되 초과하지 마세요.`;
+}
+
+/* ---- 분량 맞추기 (압축 + 확장, 목표의 95~100% 범위를 노린다) ----
+   enforceLength는 하위 호환을 위해 그대로 남겨두고, 실제 호출부는 이 fitLength로 교체한다.
+   반환: {text, precompress, shortfall} — shortfall은 최종 분량이 목표의 95% 미만일 때만 채워진다. */
+async function fitLength(text, {targetLen, fileBlocks, rawText, onDelta} = {}){
+  const original = String(text||"");
+  let cur = original;
+  const limit = Math.max(1, (+targetLen) || measure(cur));
+  const minLen = Math.round(limit * MIN_FILL_RATIO);
+  const stallDelta = limit * EXPAND_STALL_RATIO;
+  let precompress = null;
+  let compressTries = 0, expandTries = 0;
+
+  while(true){
+    const m = measure(cur);
+    if(m > limit){
+      if(compressTries >= MAX_COMPRESS_TRIES) break;
+      compressTries++;
+      try{
+        const charApprox = getUnit()==="byte" ? limit/getHangulBytes() : limit;
+        const mt = Math.max(800, Math.round(charApprox*3));
+        const compressed = await callAI({
+          system: COMPRESS_SYS,
+          content:[{kind:"text", text:`목표 분량: ${targetLabel(limit)} 이하 (현재 ${targetLabel(m)}). 반드시 목표 이하로, 목표의 약 90% 수준까지 압축하세요.\n\n[세특]\n${cur}`}],
+          maxTokens: mt, stream:false
+        });
+        if(compressed && compressed.trim() && measure(compressed) < m){
+          if(precompress===null) precompress = cur;
+          cur = compressed;
+          onDelta && onDelta(cur);
+          continue;
+        }
+      }catch(e){}
+      break;
+    }
+    if(m < minLen){
+      if(expandTries >= MAX_EXPAND_TRIES) break;
+      expandTries++;
+      try{
+        const charApprox = getUnit()==="byte" ? limit/getHangulBytes() : limit;
+        const mt = Math.max(1200, Math.round(charApprox*3));
+        const content = [...(fileBlocks||[]), {kind:"text", text:`${expandNeedMsg(m, limit, minLen)}\n\n[학생 원자료]\n${rawText||"(원자료 없음 — 아래 세특에 이미 있는 사실만 활용)"}\n\n[세특]\n${cur}`}];
+        const expanded = await callAI({ system: EXPAND_SYS, content, maxTokens: mt, stream:false });
+        if(expanded && expanded.trim()){
+          const em = measure(expanded);
+          // 더 짧아지거나 같으면 채택하지 않고 중단
+          if(em <= m) break;
+          cur = expanded;
+          onDelta && onDelta(cur);
+          // 정체(증가량이 목표의 2% 미만)면 채택만 하고 중단 — 무한 반복 방지
+          if(em - m < stallDelta) break;
+          continue;
+        }
+      }catch(e){}
+      break;
+    }
+    break;
+  }
+
+  if(measure(cur) > limit){
+    if(precompress===null) precompress = original;
+    cur = trimToLimit(cur, limit);
+    onDelta && onDelta(cur);
+  }
+  const measured = measure(cur);
+  const shortfall = (measured < minLen) ? {measured, limit, ratio: measured/limit} : null;
+  return {text: cur, precompress, shortfall};
+}
+
 /* ---- 빠른 생성 코어 (단일/일괄 공용) ---- */
 async function runQuickCore({rawText, fileBlocks, targetLen, onDelta}){
   const content = [...fileBlocks, {kind:"text", text:rawText}];
@@ -1335,8 +1486,21 @@ async function runQuickCore({rawText, fileBlocks, targetLen, onDelta}){
     onDelta:t => { onDelta && onDelta(t); }
   });
   if(!text.trim()){ const e = new Error("응답이 비어 있습니다. 다시 시도해 주세요."); e.emptyResult = true; throw e; }
-  const enf = await enforceLength(text, {targetLen, onDelta});
-  return {final: enf.text, precompress: enf.precompress};
+  const enf = await fitLength(text, {targetLen, fileBlocks, rawText, onDelta});
+  let finalText = enf.text;
+  let precompress = enf.precompress;
+  let shortfall = enf.shortfall;
+  const sanitized = await sanitizeMath(finalText, {onDelta});
+  if(sanitized !== finalText){
+    // 수식 정리로 분량이 바뀌었을 수 있으므로 목표 범위로 다시 보정 (압축/확장 공용 로직 재사용)
+    const enf2 = await fitLength(sanitized, {targetLen, fileBlocks, rawText, onDelta});
+    finalText = enf2.text;
+    shortfall = enf2.shortfall;
+    if(!precompress) precompress = enf2.precompress;
+  } else {
+    finalText = sanitized;
+  }
+  return {final: finalText, precompress, shortfall};
 }
 
 /* ---- 빠른 생성 (단일 모드 래퍼) ---- */
@@ -1350,7 +1514,7 @@ async function generateQuick(){
       targetLen,
       onDelta: t => { out.textContent = t; }
     });
-    finishCount(r.final);
+    finishCount(r.final, r.shortfall);
     showPrecompress(r.precompress, targetLen);
   }catch(e){
     if(e.emptyResult){ showErr("응답이 비어 있습니다. 다시 시도해 주세요."); return; }
@@ -1450,9 +1614,16 @@ function scoreBlock(avg, targetScore){
   if(avg==null || targetScore==null) return "";
   return `\n\n[현재 점수 상황]\n현재 평균 ${avg}점입니다. 목표는 ${targetScore}점입니다. 아래 improvements와 to_perfect를 모두 해소하여 목표 점수에 도달할 수 있는 완성본을 작성하세요.`;
 }
-function buildChairMsg({rawText, draft, oks, final, prevOks, targetLen, avg, targetScore}){
+/* 목표 점수는 달성했으나 분량이 목표의 95% 미만이라 라운드를 계속 진행하는 경우 안내 블록 */
+function lenShortBlock(info, t){
+  if(!info) return "";
+  const lim = Math.max(1, (+info.limit) || t || 1);
+  const pct = Math.max(0, Math.round((info.cur / lim) * 100));
+  return `\n\n[분량 보강 요청]\n현재 분량이 목표의 ${pct}%입니다. 목표 ${targetLabel(t)}의 95~100% 범위가 되도록 원자료 근거 안에서 서술을 더 구체적으로 보강하세요(창작 금지).`;
+}
+function buildChairMsg({rawText, draft, oks, final, prevOks, targetLen, avg, targetScore, lenShortInfo}){
   const {t, lo, hi} = lenRange(targetLen);
-  const nis = nisBlock(oks), sb = scoreBlock(avg, targetScore);
+  const nis = nisBlock(oks), sb = scoreBlock(avg, targetScore), lsb = lenShortBlock(lenShortInfo, t);
   if(!final){
     return `[학생 원자료 요약]
 ${rawText}
@@ -1461,7 +1632,7 @@ ${rawText}
 ${draft}
 
 [전문 평가위원 평가 결과 (${oks.length}인)]
-${fmtEvals(oks)}${nis}${sb}
+${fmtEvals(oks)}${nis}${sb}${lsb}
 
 위 초안과 평가 결과를 반영하여 개선된 세특 본문만 작성하세요. 소극적 부분 수정이 아니라 과감하게 다시 써도 됩니다. 각 평가위원의 improvements와 to_perfect 항목을 하나도 빠짐없이 반영하세요. 각 항목이 어떻게 반영됐는지 스스로 점검한 후, 반영이 불가능한 항목(원자료에 근거 없음)만 제외하세요. 단, 원자료에 없는 사실을 창작하는 것은 여전히 금지 — 기존 사실의 서술 밀도(동기→과정→결과→성장·확장)를 끌어올리는 방식으로 반영하세요. 분량은 목표 ${targetLabel(t)} 이하(권장 ${targetLabel(Math.round(t*0.90))}~${targetLabel(Math.round(t*1.00))})로 목표에 가깝게 충실히 작성하고 절대 초과하지 마세요.`;
   }
@@ -1475,7 +1646,7 @@ ${rawText}
 ${draft}${prevBlock}
 
 [최종 라운드 평가위원 평가 결과 (${oks.length}인)]
-${fmtEvals(oks)}${nis}${sb}
+${fmtEvals(oks)}${nis}${sb}${lsb}
 
 이번 평가에서 여전히 남은 지적과 to_perfect 항목을 모두 해소한 완성본을 작성하세요. 원자료에 없는 사실은 창작하지 말고, 기존 사실의 서술 밀도(동기→과정→결과→성장·확장)를 끌어올려 반영하세요. 최종 세특은 목표 ${targetLabel(t)} 이하(권장 ${targetLabel(Math.round(t*0.90))}~${targetLabel(Math.round(t*1.00))})로 목표에 가깝게 충실히 작성하되 반드시 목표를 초과하지 말고, 초과가 예상되면 핵심을 남기고 압축하세요. 최종 세특 본문만 출력하세요.`;
 }
@@ -1522,6 +1693,7 @@ async function runPreciseCore({rawText, fileBlocks, targetLen, targetScore, maxR
   /* byte 모드는 실제 글자 수가 더 적으므로(한글 1자=2~3Byte) 대략 글자 수로 환산 후 토큰을 추정 */
   const charApprox = getUnit()==="byte" ? (+targetLen||500) / getHangulBytes() : (+targetLen||500);
   const finalTokens = Math.max(1200, charApprox * 3);
+  const effectiveLimit = Math.max(1, (+targetLen) || 500);
 
   // 남은 단계를 '건너뜀'으로 표시
   const skipFrom = (fromRound, skipChairOfRound) => {
@@ -1566,22 +1738,25 @@ async function runPreciseCore({rawText, fileBlocks, targetLen, targetScore, maxR
     lastEvals = evals;
     const isLast = (r === cfg.maxRounds);
 
-    // 목표 달성 → 현재 draft가 최종 (2라운드 이상 진행한 뒤에만 조기 종료)
-    if(avg!=null && avg >= cfg.targetScore && r >= 2){
+    // 목표 달성 → 현재 draft가 최종 (2라운드 이상 진행한 뒤에만 조기 종료). 단, 분량이 목표의 95% 미만이면 계속 진행한다.
+    const lenOk = measure(draft) >= Math.round(effectiveLimit * MIN_FILL_RATIO);
+    if(avg!=null && avg >= cfg.targetScore && r >= 2 && lenOk){
       earlyStop = true;
       skipFrom(r+1, r);
       delta(draft);
       break;
     }
+    const scoreOkButShort = (avg!=null && avg >= cfg.targetScore && r >= 2 && !lenOk);
 
     // 종합평가위원 개선 (마지막 라운드만 스트리밍)
-    step(`chair${r}`,"run");
+    step(`chair${r}`, "run", scoreOkButShort ? "분량 부족 · 계속" : undefined);
     if(isLast) delta("");
     try{
       const prevOks = (r>=2 && rounds[r-2]) ? rounds[r-2].evals.filter(x=>x.ok) : null;
       const chairMsg = buildChairMsg({
         rawText, draft, oks, final:isLast, prevOks, targetLen,
-        avg, targetScore:cfg.targetScore
+        avg, targetScore:cfg.targetScore,
+        lenShortInfo: scoreOkButShort ? {cur: measure(draft), limit: effectiveLimit} : null
       });
       const next = await callAI({
         system:CHAIR_PROMPT,
@@ -1600,11 +1775,24 @@ async function runPreciseCore({rawText, fileBlocks, targetLen, targetScore, maxR
     if(isLast) break;
   }
 
-  const enf = await enforceLength(draft, {targetLen, onDelta: t => delta(t)});
-  draft = enf.text;
+  const enf = await fitLength(draft, {targetLen, fileBlocks, rawText, onDelta: t => delta(t)});
+  let finalText = enf.text;
+  let precompress = enf.precompress;
+  let shortfall = enf.shortfall;
+  const sanitized = await sanitizeMath(finalText, {onDelta: t => delta(t)});
+  if(sanitized !== finalText){
+    // 수식 정리로 분량이 바뀌었을 수 있으므로 목표 범위로 다시 보정 (압축/확장 공용 로직 재사용)
+    const enf2 = await fitLength(sanitized, {targetLen, fileBlocks, rawText, onDelta: t => delta(t)});
+    finalText = enf2.text;
+    shortfall = enf2.shortfall;
+    if(!precompress) precompress = enf2.precompress;
+  } else {
+    finalText = sanitized;
+  }
+  draft = finalText;
 
   return Object.assign(
-    {final:draft, precompress:enf.precompress, earlyStop, targetScore:cfg.targetScore, maxRounds:cfg.maxRounds},
+    {final:draft, precompress, shortfall, earlyStop, targetScore:cfg.targetScore, maxRounds:cfg.maxRounds},
     preciseResultShape(rounds)
   );
 }
@@ -1624,12 +1812,12 @@ async function generatePrecise(){
       onStep:(id,state,sub) => setStep(id,state,sub),
       onDelta:t => { out.textContent = t; }
     });
-    finishCount(r.final);
+    finishCount(r.final, r.shortfall);
     renderReview(r);
     showPrecompress(r.precompress, targetLen);
   }catch(e){
     if(e.partial){
-      out.textContent = e.partial.text; finishCount(e.partial.text);
+      out.textContent = e.partial.text; finishCount(e.partial.text, null);
       renderReview(e.partial);
       showPrecompress(null, targetLen);
     }
@@ -1711,12 +1899,21 @@ function countLine(text, target){
   const html = `<b>${chars.toLocaleString()}</b>자 · <b>${bytes.toLocaleString()}</b>Byte / 목표 ${targetLabel(target)}${over?" <b>(초과)</b>":""}`;
   return {over, html};
 }
-function finishCount(text){
+/* 목표 분량의 95%에 못 미칠 때의 안내 문구 — 오류가 아니라 참고 자료 보강 안내 톤 */
+function shortfallNoteHtml(sf){
+  if(!sf || !sf.limit) return "";
+  const pct = Math.round((sf.ratio!=null ? sf.ratio : sf.measured/sf.limit) * 100);
+  return `<div class="hint" style="font-size:12px;color:var(--sub);margin-top:6px">`
+       + `⚠ 분량이 목표의 ${pct}%입니다. 참고 자료(산출물·정성 특성)를 더 채우면 목표에 가깝게 작성됩니다.</div>`;
+}
+function finishCount(text, shortfall){
   const target = +$("#targetLen").value;
   const {over, html} = countLine(text, target);
   const c = $("#counter"); c.style.display="block";
   c.className = "cnt mt14"+(over?" over":"");
   c.innerHTML = html;
+  const sb = $("#shortfallBox");
+  if(sb) sb.innerHTML = shortfallNoteHtml(shortfall);
   $("#copyBtn").style.display="inline-block";
 }
 /* ---- 압축 전 원본(precompress) 표시 — 단일/배치 공용. text가 없으면 컨테이너를 비운다 ---- */
@@ -1888,7 +2085,7 @@ function newStudent(){
     id: "s" + (++stuSeq) + "_" + Date.now().toString(36),
     name:"", kind:"교과", subject:"", area:"자율", areaDetail:"",
     quality:"", refText:"", files:[], targetLen:null, level:"auto",
-    result:null, precompress:null, evals:null, status:"대기", error:null, collapsed:false
+    result:null, precompress:null, shortfall:null, evals:null, status:"대기", error:null, collapsed:false
   };
 }
 /* kind/area가 바뀌어도 사용자가 명시 입력한 개별값은 절대 덮어쓰지 않는다.
@@ -2158,6 +2355,7 @@ function showBatchResult(i){
      </div>
      <div class="out" id="batchOut"></div>
      <div class="cnt mt14" id="batchCnt"></div>
+     <div id="batchShortfallBox"></div>
      <div id="batchPrecompressBox"></div>
      <div id="batchReview"></div>`;
   $("#batchOut").textContent = st.result;
@@ -2166,6 +2364,8 @@ function showBatchResult(i){
   const c = $("#batchCnt");
   c.className = "cnt mt14" + (over ? " over" : "");
   c.innerHTML = html;
+  const sb = $("#batchShortfallBox");
+  if(sb) sb.innerHTML = shortfallNoteHtml(st.shortfall);
   $("#batchCopyBtn").onclick = () => navigator.clipboard.writeText(st.result).then(() => {
     $("#batchCopyBtn").textContent = "복사됨 ✓";
     setTimeout(() => $("#batchCopyBtn").textContent = "복사", 1500);
@@ -2318,14 +2518,14 @@ async function runBatch(bmode, onlyPending){
       const fileBlocks = await buildFileBlocksFrom(s.files);
       if(bmode==="quick"){
         const q = await runQuickCore({rawText, fileBlocks, targetLen: effectiveTargetLen(s)});
-        s.result = q.final; s.precompress = q.precompress;
+        s.result = q.final; s.precompress = q.precompress; s.shortfall = q.shortfall || null;
         s.evals = null;
       } else {
         const r = await runPreciseCore({
           rawText, fileBlocks, targetLen:effectiveTargetLen(s),
           targetScore:pcfg.targetScore, maxRounds:pcfg.maxRounds
         });
-        s.result = r.final; s.precompress = r.precompress;
+        s.result = r.final; s.precompress = r.precompress; s.shortfall = r.shortfall || null;
         s.evals = {rounds:r.rounds, earlyStop:r.earlyStop, targetScore:r.targetScore, maxRounds:r.maxRounds};
       }
       s.status = "완료"; s.error = null;
@@ -2333,6 +2533,7 @@ async function runBatch(bmode, onlyPending){
       if(e.partial && e.partial.text){       // 부분 결과라도 보존
         s.result = e.partial.text;
         s.precompress = null;
+        s.shortfall = null;
         s.evals = {rounds:e.partial.rounds||[], earlyStop:false, targetScore:pcfg.targetScore, maxRounds:pcfg.maxRounds};
       }
       s.status = "실패"; s.error = e.message;
@@ -2365,7 +2566,7 @@ async function runBatch(bmode, onlyPending){
 
 /* ---- 저장 / 복원 ---- */
 const SER_FIELDS = ["id","name","kind","subject","area","areaDetail","quality","refText",
-                    "targetLen","level","result","precompress","evals","status","error"];
+                    "targetLen","level","result","precompress","shortfall","evals","status","error"];
 function serializeStudents(){
   return students.map(s => { const o = {}; SER_FIELDS.forEach(k => o[k] = s[k]); return o; });
 }
@@ -2768,6 +2969,9 @@ updatePaceInfo();
 updatePreciseLabels();
 updateAreaRecoHint();
 applyGenMode();
+
+/* ---- 테스트 훅 (검증용 노출) ---- */
+window.__test = { hasMathMarkup, stripMathFallback, sanitizeMath, fitLength, measure, trimToLimit, MIN_FILL_RATIO, MAX_EXPAND_TRIES, MAX_COMPRESS_TRIES, EXPAND_STALL_RATIO, expandNeedMsg, shortfallNoteHtml, runPreciseCore, runQuickCore, SANITIZE_SYS, EXPAND_SYS };
 </script>
 </body>
 </html>
